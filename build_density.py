@@ -8,6 +8,9 @@ Aggregate across the library -> g per cup per ingredient, with sample counts
 and spread so we can tell a solid figure from a guess.
 """
 import json, re, statistics, collections, unicodedata
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
 
 CUPS = {'cup': 1, 'cups': 1, 'c.': 1, 'tbsp': 1/16, 'tablespoon': 1/16, 'tablespoons': 1/16,
         'tsp': 1/48, 'teaspoon': 1/48, 'teaspoons': 1/48, 'quart': 4, 'quarts': 4, 'qt': 4,
@@ -126,8 +129,8 @@ def build(recipes):
     return table
 
 
-def merge_curated(t, path='/home/claude/density_curated.json'):
-    cur = json.load(open(path))
+def merge_curated(t, path=ROOT / 'density_curated.json'):
+    cur = json.load(open(path, encoding='utf-8'))
     for k, gml in cur['_liquid_g_per_ml'].items():
         e = t.get(k, {})
         # a book's "(240 ml)" is a volume identity, not a weight -> overwrite it
@@ -147,9 +150,9 @@ def merge_curated(t, path='/home/claude/density_curated.json'):
 
 
 if __name__ == '__main__':
-    R = json.load(open('/home/claude/recipes.json'))
+    R = json.load(open(ROOT / 'recipes.json', encoding='utf-8'))
     t = merge_curated(build(R))
-    json.dump(t, open('/home/claude/density_table.json', 'w'), indent=1, sort_keys=True)
+    json.dump(t, open(ROOT / 'density_table.json', 'w', encoding='utf-8'), indent=1, sort_keys=True)
     byc = collections.Counter(v['confidence'] for v in t.values())
     print(f'{len(t)} ingredient densities derived  {dict(byc)}')
     print('\nmost-observed:')

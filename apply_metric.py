@@ -10,7 +10,10 @@ Priority for a gram figure:
 Below MIN_WEIGHABLE the volume stays primary - no one can weigh 1/4 tsp.
 """
 import json, re, sys, collections
+from pathlib import Path
 from build_density import canon, CUPS, MASS_G, VOL_ML, parse_metric
+
+ROOT = Path(__file__).resolve().parent
 
 ML_PER_CUP = 236.588
 MIN_WEIGHABLE = 5.0          # grams; a 1 g kitchen scale can't resolve less
@@ -20,9 +23,9 @@ INCH = re.compile(r'(\d+(?:\.\d+)?|\d+/\d+|\d+ \d+/\d+)[- ]?(?:inch|in\.)\b(?!\s
 
 
 class Densities:
-    def __init__(self, path='/home/claude/density_table.json'):
-        self.t = {k: v for k, v in json.load(open(path)).items() if not k.startswith('_')}
-        cur = json.load(open('/home/claude/density_curated.json'))
+    def __init__(self, path=ROOT / 'density_table.json'):
+        self.t = {k: v for k, v in json.load(open(path, encoding='utf-8')).items() if not k.startswith('_')}
+        cur = json.load(open(ROOT / 'density_curated.json', encoding='utf-8'))
         self.each = cur.get('_each_grams_approx', {})
         self.each_keys = sorted(self.each, key=len, reverse=True)
         # longest keys first so "extra-virgin olive oil" beats "olive oil"
@@ -40,7 +43,7 @@ class Densities:
 
     def resolve_liquids(self):
         """Give ml-identity entries a real density via substring match."""
-        cur = json.load(open('/home/claude/density_curated.json'))['_liquid_g_per_ml']
+        cur = json.load(open(ROOT / 'density_curated.json', encoding='utf-8'))['_liquid_g_per_ml']
         lk = sorted(cur, key=len, reverse=True)
         fixed = 0
         for k, v in self.t.items():
@@ -148,11 +151,11 @@ def run(recipes, D):
 if __name__ == '__main__':
     D = Densities()
     print(f'liquid densities resolved by substring: {D.resolve_liquids()}')
-    json.dump(D.t, open('/home/claude/density_table.json', 'w'), indent=1, sort_keys=True)
+    json.dump(D.t, open(ROOT / 'density_table.json', 'w', encoding='utf-8'), indent=1, sort_keys=True)
 
-    R = json.load(open('/home/claude/recipes.json'))
+    R = json.load(open(ROOT / 'recipes.json', encoding='utf-8'))
     stats = run(R, D)
-    json.dump(R, open('/home/claude/recipes_metric.json', 'w'), indent=1, ensure_ascii=False)
+    json.dump(R, open(ROOT / 'recipes_metric.json', 'w', encoding='utf-8'), indent=1, ensure_ascii=False)
 
     tot = sum(stats.values())
     print(f'\n{tot:,} ingredients:')

@@ -1,4 +1,5 @@
 node_modules/
+.venv/
 
 # Env files may hold real credentials; .env.example is the only one meant to be committed.
 .env
@@ -7,3 +8,8 @@ node_modules/
 
 # Local cache of what's already been pushed to Supabase Storage — ephemeral, regenerable.
 scripts/upload-manifest.json
+
+# extract.py's raw, pre-metric output — a throwaway intermediate, not the documented schema.
+# recipes_metric.json (the real source of truth) stays tracked.
+/recipes.json
+/report.json

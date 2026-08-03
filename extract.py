@@ -10,7 +10,10 @@ Two passes per book:
 No per-book class names are hardcoded anywhere.
 """
 import json, re, sys, zipfile, posixpath, unicodedata, hashlib, collections
+from pathlib import Path
 from bs4 import BeautifulSoup
+
+ROOT = Path(__file__).resolve().parent
 
 # ---------------------------------------------------------------- vocabulary
 UNITS = (r'cups?|c\.|tbsp|tablespoons?|tsp|teaspoons?|ounces?|oz\.?|pounds?|lbs?\.?|'
@@ -387,8 +390,8 @@ def run(paths):
 
 if __name__ == '__main__':
     recipes, rep = run(sys.argv[1:])
-    json.dump(recipes, open('/home/claude/recipes.json', 'w'), indent=1, ensure_ascii=False)
-    json.dump(rep, open('/home/claude/report.json', 'w'), indent=1, ensure_ascii=False)
+    json.dump(recipes, open(ROOT / 'recipes.json', 'w', encoding='utf-8'), indent=1, ensure_ascii=False)
+    json.dump(rep, open(ROOT / 'report.json', 'w', encoding='utf-8'), indent=1, ensure_ascii=False)
     for r in rep:
         print(f"{r['book'][:44]:46s} recipes={r['recipes']:4d}  clean={r['clean']:4d}  "
               f"conf={r['mean_conf']:.2f}  ing={r['ingredient_classes']}")
