@@ -51,7 +51,7 @@ export interface Recipe {
   total_grams: number
   confidence: number
   warnings: string[]
-  /** Relative path under /public, e.g. "images/recipes/<id>.jpg", or null. Added by build-bundle.mjs. */
+  /** Relative path under /public, e.g. "images/recipes/<id>.webp", or null. Added by build-bundle.mjs. */
   image: string | null
   /** True when the extraction pipeline suspects this is a sub-recipe (sauce, crust, etc.) rather than a standalone dish. Added by build-bundle.mjs. */
   isComponent: boolean

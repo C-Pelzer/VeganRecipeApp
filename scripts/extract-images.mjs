@@ -20,9 +20,14 @@ const MANIFEST_PATH = path.join(ROOT, "scripts", "image-manifest.json");
 // Source images are print-resolution (2-4 MB each) for a card that renders
 // at a few hundred CSS px. Downscaling + re-encoding at extraction time is
 // the single biggest lever on repo/storage size — do it once here rather
-// than shipping full-res photos to a phone screen.
-const MAX_WIDTH = 1200;
-const JPEG_QUALITY = 78;
+// than shipping full-res photos to a phone screen. 700px covers even 2-3x
+// device pixel ratios at typical card width; WebP beats JPEG noticeably at
+// matched visual quality (tested against mozjpeg — WebP q68 came out
+// 65-73% smaller than the previous 1200px/JPEG-q78 setting with no visible
+// artifacts, since Android Chrome — the only target here — has always had
+// full WebP support).
+const MAX_WIDTH = 700;
+const WEBP_QUALITY = 68;
 
 // Decorative icons (serving-size glyphs, dividers) show up as tiny as 8-13px
 // on a side; real recipe photos in these books start at 700px+. Anything
@@ -124,13 +129,13 @@ async function main() {
     const resizedBuffer = await sharp(rawBuffer)
       .rotate() // normalize EXIF orientation before dropping the metadata that carries it
       .resize({ width: MAX_WIDTH, withoutEnlargement: true })
-      .jpeg({ quality: JPEG_QUALITY, progressive: true, mozjpeg: true })
+      .webp({ quality: WEBP_QUALITY })
       .toBuffer();
     bytesBefore += rawBuffer.length;
     bytesAfter += resizedBuffer.length;
 
-    // Re-encoded to JPEG regardless of source format, so the output extension is fixed.
-    const outName = `${recipe.id}.jpg`;
+    // Re-encoded to WebP regardless of source format, so the output extension is fixed.
+    const outName = `${recipe.id}.webp`;
     fs.writeFileSync(path.join(OUT_DIR, outName), resizedBuffer);
     manifest[recipe.id] = `images/recipes/${outName}`;
     resolved++;
