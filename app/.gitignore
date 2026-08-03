@@ -17,6 +17,9 @@ dist-ssr
 .env.*
 !.env.example
 
+# Pushed to Supabase Storage instead (scripts/upload-images.mjs) — no longer tracked in git.
+public/images/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

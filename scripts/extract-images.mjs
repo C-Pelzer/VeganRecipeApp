@@ -34,14 +34,27 @@ const WEBP_QUALITY = 68;
 // under this on either dimension gets rejected as not-actually-a-photo.
 const MIN_DIMENSION = 150;
 
-// Only the books the extraction pipeline has processed so far.
-const BOOK_TO_EPUB = {
-  "5-Ingredient Vegan Cooking": "5-ingredientvegancooking.epub",
-  "Awesome Vegan Soups": "awesomevegansoups.epub",
-  "Frugal Vegan": "frugalvegan.epub",
-  "New Vegan Baking": "newveganbaking.epub",
-  "The Ultimate Vegan Cookbook": "ultimatevegancookbookthe.epub",
-};
+// Book title -> epub filename overrides, for the rare title resolveEpubFilename()
+// below gets wrong. Empty until a real one shows up.
+const BOOK_TO_EPUB_OVERRIDES = {};
+
+const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+// The 61 source epub filenames turn out to follow one of two patterns:
+// plain ("Awesome Vegan Soups" -> awesomevegansoups.epub) or a leading "The"
+// moved to the end ("The Ultimate Vegan Cookbook" -> ultimatevegancookbookthe.epub).
+// Matching against the slugified filename avoids hand-maintaining a map for
+// all 61 books as they get processed.
+function resolveEpubFilename(bookTitle, epubFilenames) {
+  if (BOOK_TO_EPUB_OVERRIDES[bookTitle]) return BOOK_TO_EPUB_OVERRIDES[bookTitle];
+
+  const bare = slugify(bookTitle);
+  const theSuffixed = slugify(bookTitle.replace(/^the\s+/i, "")) + "the";
+  const bySlug = (target) =>
+    epubFilenames.find((f) => slugify(f.replace(/\.epub$/i, "")) === target);
+
+  return bySlug(bare) ?? bySlug(theSuffixed) ?? null;
+}
 
 function findAll(xhtml, pattern) {
   return [...xhtml.matchAll(pattern)].map((m) => m[1]);
@@ -74,6 +87,10 @@ async function main() {
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
+  const epubFilenames = fs.readdirSync(EPUB_DIR).filter((f) => /\.epub$/i.test(f));
+  const epubNameByBook = new Map();
+  const unresolvedBooks = new Set();
+
   const zipCache = new Map();
   const manifest = {};
   let resolved = 0;
@@ -83,8 +100,17 @@ async function main() {
   let bytesAfter = 0;
 
   for (const recipe of recipes) {
-    const epubName = BOOK_TO_EPUB[recipe.source_book];
-    if (!epubName) continue; // book not yet in scope for image extraction
+    if (!epubNameByBook.has(recipe.source_book)) {
+      epubNameByBook.set(
+        recipe.source_book,
+        resolveEpubFilename(recipe.source_book, epubFilenames)
+      );
+    }
+    const epubName = epubNameByBook.get(recipe.source_book);
+    if (!epubName) {
+      unresolvedBooks.add(recipe.source_book);
+      continue; // no matching epub found — add an override once the real filename is known
+    }
 
     if (!zipCache.has(epubName)) {
       zipCache.set(epubName, new AdmZip(path.join(EPUB_DIR, epubName)));
@@ -167,6 +193,13 @@ async function main() {
   }
   if (orphansRemoved) {
     console.log(`Removed ${orphansRemoved} orphaned image file(s) from a previous run.`);
+  }
+  if (unresolvedBooks.size) {
+    console.log(
+      `Could not match an epub for ${unresolvedBooks.size} book(s) — add an override in ` +
+        `BOOK_TO_EPUB_OVERRIDES:`,
+      [...unresolvedBooks]
+    );
   }
 }
 

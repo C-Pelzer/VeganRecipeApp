@@ -62,7 +62,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
       <div className="relative h-full w-full overflow-hidden rounded-3xl bg-neutral-800 shadow-xl shadow-black/40">
         {recipe.image ? (
           <img
-            src={`/${recipe.image}`}
+            src={recipe.image}
             alt=""
             className="h-full w-full object-cover"
             draggable={false}

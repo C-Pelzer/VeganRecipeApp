@@ -2,7 +2,13 @@
   "name": "vegan-recipe-app-scripts",
   "private": true,
   "type": "module",
+  "scripts": {
+    "extract-images": "node extract-images.mjs",
+    "upload-images": "node --env-file=.env upload-images.mjs",
+    "build-bundle": "node --env-file=.env build-bundle.mjs"
+  },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.0",
     "adm-zip": "^0.5.16",
     "sharp": "^0.35.3"
   }

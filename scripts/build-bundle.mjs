@@ -10,6 +10,22 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const OUT_PATH = path.join(ROOT, "app", "public", "data", "recipes.json");
+const BUCKET = "recipe-images";
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+if (!SUPABASE_URL) {
+  throw new Error(
+    "Missing SUPABASE_URL. Copy scripts/.env.example to scripts/.env and fill it in, then " +
+      "run with `node --env-file=.env build-bundle.mjs`."
+  );
+}
+
+// Images live in Supabase Storage (scripts/upload-images.mjs), not in the repo —
+// the manifest only tells us the filename, so build the public object URL here.
+function imageUrl(manifestPath) {
+  if (!manifestPath) return null;
+  return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path.basename(manifestPath)}`;
+}
 
 // Component/sub-recipe words: a card offering "Cashew Cream" as dinner is the
 // failure mode this guards against (see CLAUDE_CODE_BRIEF.md "Known gaps").
@@ -102,7 +118,7 @@ function main() {
   const ingredientItemsByRecipe = buildIngredientItemsByRecipe(recipes);
 
   const bundle = recipes.map((recipe) => {
-    const image = manifest[recipe.id] ?? null;
+    const image = imageUrl(manifest[recipe.id]);
     const withImage = { ...recipe, image };
     return {
       ...withImage,

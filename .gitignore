@@ -1,1 +1,9 @@
 node_modules/
+
+# Env files may hold real credentials; .env.example is the only one meant to be committed.
+.env
+.env.*
+!.env.example
+
+# Local cache of what's already been pushed to Supabase Storage — ephemeral, regenerable.
+scripts/upload-manifest.json
