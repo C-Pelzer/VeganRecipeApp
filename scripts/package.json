@@ -1,0 +1,8 @@
+{
+  "name": "vegan-recipe-app-scripts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "adm-zip": "^0.5.16"
+  }
+}
