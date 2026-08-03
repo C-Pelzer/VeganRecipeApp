@@ -36,5 +36,3 @@ export class LocalStore implements SyncStore {
     return swipe
   }
 }
-
-export const store: SyncStore = new LocalStore()

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRecipes } from '../../lib/data'
-import { store } from '../../lib/store/localStore'
+import { store } from '../../lib/store/supabaseStore'
 import type { HouseholdMember } from '../../lib/profile'
 import type { Recipe, Swipe, SwipeDirection } from '../../types/recipe'
 import { SwipeCard, type SwipeCardHandle } from './SwipeCard'
