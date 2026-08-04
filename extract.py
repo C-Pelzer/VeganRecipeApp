@@ -376,7 +376,14 @@ def run(paths):
             got += parse_doc(btitle, d, bl, roles)
         for r in got:
             r['authors'] = meta.get('authors')
-            r['id'] = hashlib.sha1(f"{btitle}|{r['title']}".encode()).hexdigest()[:12]
+            # book + source_file + title: title alone collides when a book misreads
+            # a diet-tag badge as the title (many different dishes all titled
+            # "Gluten-Free"); source_file alone collides when a book legitimately
+            # packs multiple recipes into one content file, or splits one recipe
+            # into fragments. Combined, a collision needs the same book to repeat
+            # both the exact file and the exact title, which doesn't happen.
+            r['id'] = hashlib.sha1(
+                f"{btitle}|{r['source_file']}|{r['title']}".encode()).hexdigest()[:12]
             r['confidence'], r['warnings'] = score(r)
         all_recipes += got
         report.append({'file': p.split('/')[-1], 'book': btitle, 'docs': len(docs),

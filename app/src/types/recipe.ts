@@ -51,10 +51,12 @@ export interface Recipe {
   total_grams: number
   confidence: number
   warnings: string[]
-  /** Relative path under /public, e.g. "images/recipes/<id>.webp", or null. Added by build-bundle.mjs. */
+  /** Public Supabase Storage URL, or null. Added by build-bundle.mjs. */
   image: string | null
   /** True when the extraction pipeline suspects this is a sub-recipe (sauce, crust, etc.) rather than a standalone dish. Added by build-bundle.mjs. */
   isComponent: boolean
+  /** False when extraction found no method steps at all — a broken recipe, not just an incomplete one. Added by build-bundle.mjs. */
+  hasSteps: boolean
 }
 
 export type SwipeDirection = 'left' | 'right'

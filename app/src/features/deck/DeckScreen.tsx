@@ -7,6 +7,12 @@ import { SwipeCard, type SwipeCardHandle } from './SwipeCard'
 
 const VISIBLE_STACK_SIZE = 3
 
+// Sub-recipes (isComponent) and recipes with no method steps at all (a broken
+// extraction, not just an incomplete one) don't belong in the swipe deck.
+function isDeckEligible(recipe: Recipe): boolean {
+  return !recipe.isComponent && recipe.hasSteps
+}
+
 interface DeckScreenProps {
   currentUser: HouseholdMember
 }
@@ -24,16 +30,16 @@ export function DeckScreen({ currentUser }: DeckScreenProps) {
   useEffect(() => {
     if (!recipes || !priorSwipes) return
     const alreadySwiped = new Set(priorSwipes.map((s) => s.recipeId))
-    setQueue(recipes.filter((r) => !r.isComponent && !alreadySwiped.has(r.id)))
+    setQueue(recipes.filter((r) => isDeckEligible(r) && !alreadySwiped.has(r.id)))
   }, [recipes, priorSwipes])
 
-  const total = useMemo(() => recipes?.filter((r) => !r.isComponent).length ?? 0, [recipes])
+  const total = useMemo(() => recipes?.filter(isDeckEligible).length ?? 0, [recipes])
 
-  function handleSwipe(direction: SwipeDirection) {
-    const top = queue[0]
-    if (!top) return
-    store.recordSwipe(currentUser, top.id, direction)
-    setQueue((q) => q.slice(1))
+  function handleSwipe(recipeId: string, direction: SwipeDirection) {
+    store.recordSwipe(currentUser, recipeId, direction)
+    // Filter by id rather than slicing the front — correct even if this fires
+    // out of order relative to the queue's current state.
+    setQueue((q) => q.filter((r) => r.id !== recipeId))
   }
 
   if (error) {

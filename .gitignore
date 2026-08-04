@@ -1,5 +1,6 @@
 node_modules/
 .venv/
+__pycache__/
 
 # Env files may hold real credentials; .env.example is the only one meant to be committed.
 .env

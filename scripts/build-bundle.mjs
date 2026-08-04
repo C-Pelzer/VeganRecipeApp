@@ -123,17 +123,26 @@ function main() {
     return {
       ...withImage,
       isComponent: looksLikeComponent(withImage, ingredientItemsByRecipe),
+      // Ingredients with no method steps at all aren't a lesser recipe, they're a
+      // broken one (some books' step-vs-ingredient classifier misses entirely) —
+      // exclude from the deck rather than surface as a "warning" like the softer
+      // ones (e.g. "no servings found").
+      hasSteps: recipe.steps.length > 0,
     };
   });
 
   const componentCount = bundle.filter((r) => r.isComponent).length;
+  const noStepsCount = bundle.filter((r) => !r.hasSteps).length;
   const withImageCount = bundle.filter((r) => r.image).length;
 
   fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
   fs.writeFileSync(OUT_PATH, JSON.stringify(bundle));
 
   console.log(`Wrote ${bundle.length} recipes to ${path.relative(ROOT, OUT_PATH)}`);
-  console.log(`  ${withImageCount} with images, ${componentCount} flagged as sub-recipes`);
+  console.log(
+    `  ${withImageCount} with images, ${componentCount} flagged as sub-recipes, ` +
+      `${noStepsCount} with no method steps`
+  );
 }
 
 main();

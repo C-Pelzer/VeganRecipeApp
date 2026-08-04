@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle } from 'react'
+import { forwardRef, useImperativeHandle, useRef } from 'react'
 import { motion, useAnimation, useMotionValue, useTransform, type PanInfo } from 'framer-motion'
 import type { Recipe, SwipeDirection } from '../../types/recipe'
 
@@ -9,7 +9,7 @@ interface SwipeCardProps {
   recipe: Recipe
   isTop: boolean
   stackDepth: number
-  onSwipe: (direction: SwipeDirection) => void
+  onSwipe: (recipeId: string, direction: SwipeDirection) => void
 }
 
 export interface SwipeCardHandle {
@@ -25,15 +25,21 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
   const likeOpacity = useTransform(x, [20, 120], [0, 1])
   const nopeOpacity = useTransform(x, [-120, -20], [1, 0])
   const controls = useAnimation()
+  // A rapid double-tap/drag can call this again before the card's own state
+  // updates unmount it — without this guard, the fly-off animation restarts
+  // and onSwipe fires a second time for the same card.
+  const hasSwipedRef = useRef(false)
 
   async function flyOffScreen(direction: SwipeDirection) {
+    if (hasSwipedRef.current) return
+    hasSwipedRef.current = true
     await controls.start({
       x: direction === 'right' ? 600 : -600,
       rotate: direction === 'right' ? 20 : -20,
       opacity: 0,
       transition: { duration: 0.2 },
     })
-    onSwipe(direction)
+    onSwipe(recipe.id, direction)
   }
 
   useImperativeHandle(ref, () => ({ triggerSwipe: flyOffScreen }))

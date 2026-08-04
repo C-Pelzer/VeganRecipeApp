@@ -38,7 +38,12 @@ const MIN_DIMENSION = 150;
 // below gets wrong. Empty until a real one shows up.
 const BOOK_TO_EPUB_OVERRIDES = {};
 
-const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+const slugify = (s) =>
+  s
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\+/g, " plus ")
+    .replace(/[^a-z0-9]/g, "");
 
 // The 61 source epub filenames turn out to follow one of two patterns:
 // plain ("Awesome Vegan Soups" -> awesomevegansoups.epub) or a leading "The"
@@ -50,10 +55,21 @@ function resolveEpubFilename(bookTitle, epubFilenames) {
 
   const bare = slugify(bookTitle);
   const theSuffixed = slugify(bookTitle.replace(/^the\s+/i, "")) + "the";
-  const bySlug = (target) =>
-    epubFilenames.find((f) => slugify(f.replace(/\.epub$/i, "")) === target);
+  const slugToFile = new Map(
+    epubFilenames.map((f) => [slugify(f.replace(/\.epub$/i, "")), f])
+  );
 
-  return bySlug(bare) ?? bySlug(theSuffixed) ?? null;
+  if (slugToFile.has(bare)) return slugToFile.get(bare);
+  if (slugToFile.has(theSuffixed)) return slugToFile.get(theSuffixed);
+
+  // The book's metadata title and the epub's filename don't always agree on
+  // which one includes the subtitle -- fall back to a same-direction prefix
+  // match, long enough on whichever side is shorter to not risk a false hit.
+  for (const [fileSlug, f] of slugToFile) {
+    if (bare.length >= 10 && fileSlug.startsWith(bare)) return f;
+    if (fileSlug.length >= 6 && bare.startsWith(fileSlug)) return f;
+  }
+  return null;
 }
 
 function findAll(xhtml, pattern) {
