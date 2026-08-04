@@ -178,7 +178,15 @@ async function main() {
 
     // Re-encoded to WebP regardless of source format, so the output extension is fixed.
     const outName = `${recipe.id}.webp`;
-    fs.writeFileSync(path.join(OUT_DIR, outName), resizedBuffer);
+    const outPath = path.join(OUT_DIR, outName);
+    // Skip the write when content is unchanged, so its mtime doesn't move —
+    // upload-images.mjs's skip-cache is mtime-based, and this script re-runs
+    // (and re-encodes) every recipe's image on every pass, not just new ones.
+    // Without this, every re-run forces a full re-upload of the whole library.
+    const existing = fs.existsSync(outPath) ? fs.readFileSync(outPath) : null;
+    if (!existing || !existing.equals(resizedBuffer)) {
+      fs.writeFileSync(outPath, resizedBuffer);
+    }
     manifest[recipe.id] = `images/recipes/${outName}`;
     resolved++;
   }

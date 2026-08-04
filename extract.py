@@ -265,6 +265,25 @@ def parse_doc(book_title, doc, bl, roles):
         is_head = tag in ('h1', 'h2', 'h3')
 
         if is_head and len(txt) < 160:
+            # A heading only means a new dish when the current recipe is either
+            # not started yet, or already complete-shaped (ingredients AND steps
+            # both present). The ambiguous window -- ingredients captured, steps
+            # not yet started -- is where some books put a heading for something
+            # that isn't a new recipe (a "SERVES 2" metadata line, a sub-component
+            # name, an alternate-method label). Flushing there ends the real
+            # recipe before its steps are seen, and stripped the steps that
+            # followed since they'd land on a phantom title with no ingredients,
+            # which flush() discards for failing the >=2-ingredients check.
+            mid_recipe = cur and cur['ingredient_groups'] and not cur['steps']
+            if mid_recipe:
+                sv = SERVES.search(txt)
+                if sv and len(txt) < 90:
+                    cur['servings_text'] = cur['servings_text'] or norm(sv.group(0))
+                    cur['servings'] = cur['servings'] or qty_to_float(sv.group('val'))
+                else:
+                    cur['ingredient_groups'].append(
+                        {'name': norm(txt).rstrip(':'), 'ingredients': []})
+                continue
             flush()
             pending_yield = False
             if SKIP_TITLE.match(txt):

@@ -5202,11 +5202,11 @@
  },
  "chopped fresh dill": {
   "confidence": "medium",
-  "g_per_cup": 62.0,
-  "n": 15,
-  "n_agree": 14,
+  "g_per_cup": 64.0,
+  "n": 14,
+  "n_agree": 13,
   "source": "cookbook-derived",
-  "spread": 0.258
+  "spread": 0.25
  },
  "chopped fresh dill 2 bay leaves": {
   "confidence": "low",
@@ -8076,11 +8076,11 @@
  },
  "cooked chickpeas": {
   "confidence": "high",
-  "cookbook_value": 165.0,
+  "cookbook_value": 165.8,
   "g_per_cup": 164,
-  "n": 61,
+  "n": 60,
   "source": "curated-reference",
-  "spread": 0.485
+  "spread": 0.482
  },
  "cooked corn": {
   "confidence": "low",
@@ -14153,10 +14153,10 @@
  "fresh blackberries": {
   "confidence": "high",
   "g_per_cup": 144.0,
-  "n": 5,
-  "n_agree": 5,
+  "n": 6,
+  "n_agree": 6,
   "source": "cookbook-derived",
-  "spread": 0.083
+  "spread": 0.139
  },
  "fresh blackberries or any other berries": {
   "confidence": "low",
@@ -21633,11 +21633,11 @@
  },
  "minced fresh dill": {
   "confidence": "medium",
-  "g_per_cup": 58.7,
-  "n": 2,
-  "n_agree": 2,
+  "g_per_cup": 64.0,
+  "n": 5,
+  "n_agree": 3,
   "source": "cookbook-derived",
-  "spread": 0.182
+  "spread": 0.333
  },
  "minced fresh galangal or ginger root": {
   "confidence": "low",
@@ -21666,14 +21666,6 @@
  "minced fresh lemongrass": {
   "confidence": "low",
   "g_per_cup": 74.7,
-  "n": 1,
-  "n_agree": 1,
-  "source": "cookbook-derived",
-  "spread": 0
- },
- "minced fresh mint": {
-  "confidence": "low",
-  "g_per_cup": 88.0,
   "n": 1,
   "n_agree": 1,
   "source": "cookbook-derived",
@@ -25248,8 +25240,8 @@
  "pine nuts": {
   "confidence": "medium",
   "g_per_cup": 136.0,
-  "n": 36,
-  "n_agree": 36,
+  "n": 35,
+  "n_agree": 35,
   "source": "cookbook-derived",
   "spread": 0.176
  },
@@ -27823,8 +27815,8 @@
   "g_per_ml": 1.01,
   "liquid": true,
   "ml_per_cup": 240.0,
-  "n": 36,
-  "n_agree": 36,
+  "n": 35,
+  "n_agree": 35,
   "source": "curated-density (vinegar)",
   "spread": 0.0
  },
@@ -30107,14 +30099,6 @@
   "source": "cookbook-derived",
   "spread": 0
  },
- "short-grain white rice": {
-  "confidence": "low",
-  "g_per_cup": 193.3,
-  "n": 1,
-  "n_agree": 1,
-  "source": "cookbook-derived",
-  "spread": 0
- },
  "shoyu": {
   "confidence": "high",
   "liquid": true,
@@ -30184,12 +30168,12 @@
   "spread": 0.0
  },
  "shredded cucumber": {
-  "confidence": "medium",
+  "confidence": "low",
   "g_per_cup": 120.0,
-  "n": 2,
-  "n_agree": 2,
+  "n": 1,
+  "n_agree": 1,
   "source": "cookbook-derived",
-  "spread": 0.0
+  "spread": 0
  },
  "shredded fennel": {
   "confidence": "low",
@@ -32663,8 +32647,8 @@
  "sun-dried tomatoes": {
   "confidence": "low",
   "g_per_cup": 56.0,
-  "n": 25,
-  "n_agree": 15,
+  "n": 26,
+  "n_agree": 16,
   "source": "cookbook-derived",
   "spread": 0.536
  },
@@ -35844,12 +35828,12 @@
   "spread": 0.0
  },
  "unsweetened soy yogurt": {
-  "confidence": "medium",
-  "g_per_cup": 265.0,
-  "n": 2,
-  "n_agree": 2,
+  "confidence": "low",
+  "g_per_cup": 280.0,
+  "n": 1,
+  "n_agree": 1,
   "source": "cookbook-derived",
-  "spread": 0.113
+  "spread": 0
  },
  "unsweetened soymilk": {
   "confidence": "high",
