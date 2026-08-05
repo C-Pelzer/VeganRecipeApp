@@ -1,6 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef } from 'react'
 import { motion, useAnimation, useMotionValue, useTransform, type PanInfo } from 'framer-motion'
-import { Link, useNavigate } from 'react-router-dom'
 import type { Recipe, SwipeDirection } from '../../types/recipe'
 
 const SWIPE_THRESHOLD = 100
@@ -16,6 +15,7 @@ interface SwipeCardProps {
   isTop: boolean
   stackDepth: number
   onSwipe: (recipeId: string, direction: SwipeDirection) => void
+  onViewDetails: (recipeId: string) => void
 }
 
 export interface SwipeCardHandle {
@@ -23,7 +23,7 @@ export interface SwipeCardHandle {
 }
 
 export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function SwipeCard(
-  { recipe, isTop, stackDepth, onSwipe },
+  { recipe, isTop, stackDepth, onSwipe, onViewDetails },
   ref,
 ) {
   const x = useMotionValue(0)
@@ -33,7 +33,6 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
   const nopeOpacity = useTransform(x, [-120, -20], [1, 0])
   const removeOpacity = useTransform(y, [20, 120], [0, 1])
   const controls = useAnimation()
-  const navigate = useNavigate()
   // A rapid double-tap/drag can call this again before the card's own state
   // updates unmount it — without this guard, the fly-off animation restarts
   // and onSwipe fires a second time for the same card.
@@ -69,7 +68,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
 
   function handleTap() {
     if (dragDistanceRef.current > TAP_MAX_DRAG_DISTANCE) return
-    navigate(`/recipe/${recipe.id}`)
+    onViewDetails(recipe.id)
   }
 
   async function handleDragEnd(_event: unknown, info: PanInfo) {
@@ -162,14 +161,17 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
               </h2>
             </div>
             {isTop && (
-              <Link
-                to={`/recipe/${recipe.id}`}
-                onClick={(e) => e.stopPropagation()}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onViewDetails(recipe.id)
+                }}
                 aria-label="View recipe details"
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-base text-white"
               >
                 ⓘ
-              </Link>
+              </button>
             )}
           </div>
           <div className="mt-2 flex flex-wrap gap-3 text-sm text-white/70">

@@ -90,5 +90,44 @@ export interface RecipePriority {
 export interface Deck {
   id: string
   label: string
-  isEligible: (recipe: Recipe, priority: RecipePriority | undefined) => boolean
+  isEligible: (recipe: Recipe, priority: RecipePriority | undefined, tagSlugs: Set<string>) => boolean
+}
+
+/** Pipeline-computed grouping (scripts/tag-recipes.mjs) — see scripts/schema-recipe-tags.sql. */
+export type TagCategory = 'time' | 'cuisine' | 'ingredient'
+
+export interface RecipeTag {
+  recipeId: string
+  category: TagCategory
+  tagSlug: string
+  label: string
+}
+
+/** One line of the shared household shopping list (scripts/schema-shopping-list.sql). */
+export interface ShoppingListItem {
+  itemKey: string
+  unitKey: string
+  qtyTotal: number
+  qtyNotes: string
+  checked: boolean
+  updatedAt: string
+}
+
+/** A recipe currently "in the plan" (scripts/schema-meal-plan.sql). */
+export interface MealPlanEntry {
+  recipeId: string
+  addedAt: string
+}
+
+/**
+ * Shared personal notes/edits for a recipe (scripts/schema-recipe-overrides.sql).
+ * Empty ingredientsOverride/stepsOverride means "no edit — show the book's
+ * original"; freeform one-item/step-per-line text otherwise.
+ */
+export interface RecipeOverride {
+  recipeId: string
+  notes: string
+  ingredientsOverride: string
+  stepsOverride: string
+  updatedAt: string
 }

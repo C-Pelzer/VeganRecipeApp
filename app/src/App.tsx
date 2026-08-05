@@ -1,13 +1,19 @@
 import { useState } from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { NavDrawer } from './components/NavDrawer'
+import { RecipeDetailModal } from './components/RecipeDetailModal'
+import { DEFAULT_DECK } from './features/deck/decks'
 import { DeckScreen } from './features/deck/DeckScreen'
 import { FavoritesScreen } from './features/favorites/FavoritesScreen'
-import { RecipeDetailScreen } from './features/recipe/RecipeDetailScreen'
+import { ShoppingListScreen } from './features/shoppingList/ShoppingListScreen'
+import { MealPlanScreen } from './features/mealPlan/MealPlanScreen'
 import { ProfilePicker } from './features/profile/ProfilePicker'
 import { clearCurrentUser, getCurrentUser, setCurrentUser, type HouseholdMember } from './lib/profile'
 
 function App() {
   const [currentUser, setCurrentUserState] = useState<HouseholdMember | null>(getCurrentUser)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [viewingRecipeId, setViewingRecipeId] = useState<string | null>(null)
 
   function handleSelect(user: HouseholdMember) {
     setCurrentUser(user)
@@ -17,24 +23,52 @@ function App() {
   function handleSwitchUser() {
     clearCurrentUser()
     setCurrentUserState(null)
+    setMenuOpen(false)
   }
 
   return (
     <div className="h-full min-h-screen bg-neutral-950">
       {currentUser ? (
         <BrowserRouter>
+          <NavDrawer
+            isOpen={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            currentUser={currentUser}
+            onSwitchUser={handleSwitchUser}
+          />
+          <RecipeDetailModal recipeId={viewingRecipeId} onClose={() => setViewingRecipeId(null)} />
           <Routes>
+            <Route path="/" element={<Navigate to={`/deck/${DEFAULT_DECK.id}`} replace />} />
             <Route
-              path="/"
-              element={<DeckScreen currentUser={currentUser} onSwitchUser={handleSwitchUser} />}
+              path="/deck/:deckId"
+              element={
+                <DeckScreen
+                  currentUser={currentUser}
+                  onOpenMenu={() => setMenuOpen(true)}
+                  onViewRecipe={setViewingRecipeId}
+                />
+              }
             />
             <Route
               path="/favorites"
               element={
-                <FavoritesScreen currentUser={currentUser} onSwitchUser={handleSwitchUser} />
+                <FavoritesScreen
+                  currentUser={currentUser}
+                  onOpenMenu={() => setMenuOpen(true)}
+                  onViewRecipe={setViewingRecipeId}
+                />
               }
             />
-            <Route path="/recipe/:id" element={<RecipeDetailScreen />} />
+            <Route
+              path="/shopping-list"
+              element={<ShoppingListScreen onOpenMenu={() => setMenuOpen(true)} />}
+            />
+            <Route
+              path="/meal-plan"
+              element={
+                <MealPlanScreen onOpenMenu={() => setMenuOpen(true)} onViewRecipe={setViewingRecipeId} />
+              }
+            />
           </Routes>
         </BrowserRouter>
       ) : (

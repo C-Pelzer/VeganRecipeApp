@@ -16,3 +16,12 @@ export const DECKS: Deck[] = [
 ]
 
 export const DEFAULT_DECK = DECKS[1]
+
+/** Builds a Deck for a tag from the recipe_tags table (see app/src/lib/tags.ts). */
+export function tagDeck(tag: { slug: string; label: string }): Deck {
+  return {
+    id: tag.slug,
+    label: tag.label,
+    isEligible: (_recipe, _priority, tagSlugs) => tagSlugs.has(tag.slug),
+  }
+}
