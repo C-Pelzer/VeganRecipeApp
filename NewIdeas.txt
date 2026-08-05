@@ -1,0 +1,14 @@
+Here I'm going to add some additional features that I want to add.
+
+1: I want to be able to load in any standard cooking website recipe. ex: https://www.stephsunshine.com/vegan-life/vegan-cannoli/#recipe
+2: I want to categorize the recipes into different swipe decks, with each swipe deck being a collection of recipes with some similarity. (ex: grouped by cooking time, grouped nationality of dish, grouped by ingredient, grouped by being new)
+3: I want the ability to take a picture of the meal after it's made to add to the recipe's image (Tinder has multiple photos and a bio, we want the same thing eventually)
+4: Each recipe that we add should get a priority of 5. If it gets swiped left, the priority goes down one, swiped right, the priority goes up one, swiped down, the item gets removed from the users list of possible recipes. Also when a recipe's priority reaches zero, then we should also remove it from the possible recipes.
+5: I want the ability to add notes, adjust recipes, and save all of that back into the object.
+6: I want to be able to extend the Tinder style to other things, like movies, or activites.
+7: I want the right swipes to get added to a favorites list. The favorites list should also allow you to select multiple meals and output a shopping list from the selected meals.
+8: I want to be able to pair/group users. The group will have a favorites list that is the inner join of the recipes each user has favorited. (ex: A likes spaghetti and ice cream, b likes ice cream and cereal, so the group list would just be ice cream.)
+9: I want to send a slide deck to another user/group, prompting us both to swipe on the meals.
+10: In order to do many of the things above, we need the ability to track a user identity. We don't need anything big or robust, just a way to have instances of swipe decks for a given user at a given time. As a user I might swipe the dessert deck each day, and select different desserts each time.
+11: I want to have a calendar where each day has a breakfast, lunch, and dinner slot where you can select a meal from the favorites list, and assign a person to it (Cameron or Mallorie)
+12: When presented with a recipe, I want to be able to click into the recipe and see a list of ingredients, as well as any meal type tags, and additional recipe information for general viewing.
