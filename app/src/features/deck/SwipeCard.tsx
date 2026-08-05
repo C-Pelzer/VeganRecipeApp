@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef } from 'react'
 import { motion, useAnimation, useMotionValue, useTransform, type PanInfo } from 'framer-motion'
+import { Link, useNavigate } from 'react-router-dom'
 import type { Recipe, SwipeDirection } from '../../types/recipe'
 
 const SWIPE_THRESHOLD = 100
@@ -27,6 +28,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
   const nopeOpacity = useTransform(x, [-120, -20], [1, 0])
   const removeOpacity = useTransform(y, [20, 120], [0, 1])
   const controls = useAnimation()
+  const navigate = useNavigate()
   // A rapid double-tap/drag can call this again before the card's own state
   // updates unmount it — without this guard, the fly-off animation restarts
   // and onSwipe fires a second time for the same card.
@@ -81,6 +83,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
       dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
       dragElastic={1}
       onDragEnd={isTop ? handleDragEnd : undefined}
+      onTap={isTop ? () => navigate(`/recipe/${recipe.id}`) : undefined}
     >
       <div className="relative h-full w-full overflow-hidden rounded-3xl bg-neutral-800 shadow-xl shadow-black/40">
         {recipe.image ? (
@@ -122,10 +125,26 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
         )}
 
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 pt-16">
-          <p className="text-xs font-medium uppercase tracking-wide text-white/60">
-            {recipe.source_book}
-          </p>
-          <h2 className="mt-1 text-xl font-semibold leading-tight text-white">{recipe.title}</h2>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wide text-white/60">
+                {recipe.source_book}
+              </p>
+              <h2 className="mt-1 text-xl font-semibold leading-tight text-white">
+                {recipe.title}
+              </h2>
+            </div>
+            {isTop && (
+              <Link
+                to={`/recipe/${recipe.id}`}
+                onClick={(e) => e.stopPropagation()}
+                aria-label="View recipe details"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-base text-white"
+              >
+                ⓘ
+              </Link>
+            )}
+          </div>
           <div className="mt-2 flex flex-wrap gap-3 text-sm text-white/70">
             <span>{recipe.ingredient_count} ingredients</span>
             {recipe.time_text && <span>{recipe.time_text}</span>}

@@ -96,7 +96,11 @@ export function FavoritesScreen({ currentUser }: FavoritesScreenProps) {
       ) : (
         <div className="flex-1 space-y-3 overflow-y-auto">
           {favoriteRecipes.map((recipe) => (
-            <div key={recipe.id} className="flex gap-3 rounded-2xl bg-neutral-900 p-3">
+            <Link
+              key={recipe.id}
+              to={`/recipe/${recipe.id}`}
+              className="flex gap-3 rounded-2xl bg-neutral-900 p-3"
+            >
               <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-neutral-800">
                 {recipe.image ? (
                   <img src={recipe.image} alt="" className="h-full w-full object-cover" />
@@ -111,7 +115,7 @@ export function FavoritesScreen({ currentUser }: FavoritesScreenProps) {
                 <p className="truncate font-medium text-white">{recipe.title}</p>
                 <p className="text-xs text-white/50">{recipe.ingredient_count} ingredients</p>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

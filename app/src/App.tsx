@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { DeckScreen } from './features/deck/DeckScreen'
 import { FavoritesScreen } from './features/favorites/FavoritesScreen'
+import { RecipeDetailScreen } from './features/recipe/RecipeDetailScreen'
 import { ProfilePicker } from './features/profile/ProfilePicker'
 import { getCurrentUser, setCurrentUser, type HouseholdMember } from './lib/profile'
 
@@ -20,6 +21,7 @@ function App() {
           <Routes>
             <Route path="/" element={<DeckScreen currentUser={currentUser} />} />
             <Route path="/favorites" element={<FavoritesScreen currentUser={currentUser} />} />
+            <Route path="/recipe/:id" element={<RecipeDetailScreen />} />
           </Routes>
         </BrowserRouter>
       ) : (
