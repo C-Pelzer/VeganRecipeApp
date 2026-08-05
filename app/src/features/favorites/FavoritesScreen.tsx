@@ -10,9 +10,10 @@ type Tab = 'yours' | 'shared'
 
 interface FavoritesScreenProps {
   currentUser: HouseholdMember
+  onSwitchUser: () => void
 }
 
-export function FavoritesScreen({ currentUser }: FavoritesScreenProps) {
+export function FavoritesScreen({ currentUser, onSwitchUser }: FavoritesScreenProps) {
   const { recipes, error } = useRecipes()
   const [prioritiesByUser, setPrioritiesByUser] = useState<Record<
     HouseholdMember,
@@ -61,9 +62,19 @@ export function FavoritesScreen({ currentUser }: FavoritesScreenProps) {
   return (
     <div className="flex h-full flex-col p-4">
       <div className="mb-4 flex items-center justify-between text-sm">
-        <Link to="/" className="text-white/50">
-          ← Deck
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to="/" className="text-white/50">
+            ← Deck
+          </Link>
+          <button
+            type="button"
+            aria-label="Switch user"
+            onClick={onSwitchUser}
+            className="text-base leading-none text-white/50"
+          >
+            ⇄
+          </button>
+        </div>
         <div className="flex gap-1 rounded-full bg-neutral-900 p-1">
           <button
             type="button"

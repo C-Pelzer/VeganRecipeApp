@@ -38,9 +38,10 @@ function buildQueue(recipes: Recipe[], priorities: RecipePriority[], deck: Deck)
 
 interface DeckScreenProps {
   currentUser: HouseholdMember
+  onSwitchUser: () => void
 }
 
-export function DeckScreen({ currentUser }: DeckScreenProps) {
+export function DeckScreen({ currentUser, onSwitchUser }: DeckScreenProps) {
   const { recipes, error } = useRecipes()
   // priorities (state) only signals "loaded, safe to build a queue" — the actual
   // data lives in the ref below, kept current on every swipe without forcing a
@@ -110,6 +111,14 @@ export function DeckScreen({ currentUser }: DeckScreenProps) {
           <Link to="/favorites" aria-label="Favorites" className="text-base leading-none">
             ★
           </Link>
+          <button
+            type="button"
+            aria-label="Switch user"
+            onClick={onSwitchUser}
+            className="text-base leading-none text-white/50"
+          >
+            ⇄
+          </button>
         </div>
         <div className="flex gap-1 rounded-full bg-neutral-900 p-1">
           {DECKS.map((d) => (

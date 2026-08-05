@@ -5,6 +5,11 @@ import type { Recipe, SwipeDirection } from '../../types/recipe'
 
 const SWIPE_THRESHOLD = 100
 const VELOCITY_THRESHOLD = 500
+// Framer Motion's onTap can still fire after a real drag that didn't cross
+// the swipe threshold (it sprang back rather than flying off) — the release
+// still counts as "on target" since the card moved with the finger. Gate it
+// on actually-measured distance instead of trusting tap/drag disambiguation.
+const TAP_MAX_DRAG_DISTANCE = 10
 
 interface SwipeCardProps {
   recipe: Recipe
@@ -33,6 +38,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
   // updates unmount it — without this guard, the fly-off animation restarts
   // and onSwipe fires a second time for the same card.
   const hasSwipedRef = useRef(false)
+  const dragDistanceRef = useRef(0)
 
   async function flyOffScreen(direction: SwipeDirection) {
     if (hasSwipedRef.current) return
@@ -46,6 +52,25 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
   }
 
   useImperativeHandle(ref, () => ({ triggerSwipe: flyOffScreen }))
+
+  // onDragStart doesn't fire for a press that never turns into a drag (a true
+  // stationary tap) — reset on every press start (onTapStart fires for both)
+  // so a prior interaction's distance can't leak into the next one.
+  function handlePressStart() {
+    dragDistanceRef.current = 0
+  }
+
+  function handleDrag(_event: unknown, info: PanInfo) {
+    dragDistanceRef.current = Math.max(
+      dragDistanceRef.current,
+      Math.hypot(info.offset.x, info.offset.y),
+    )
+  }
+
+  function handleTap() {
+    if (dragDistanceRef.current > TAP_MAX_DRAG_DISTANCE) return
+    navigate(`/recipe/${recipe.id}`)
+  }
 
   async function handleDragEnd(_event: unknown, info: PanInfo) {
     const horizontal = Math.abs(info.offset.x) > Math.abs(info.offset.y)
@@ -82,8 +107,10 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
       drag={isTop}
       dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
       dragElastic={1}
+      onTapStart={isTop ? handlePressStart : undefined}
+      onDrag={isTop ? handleDrag : undefined}
       onDragEnd={isTop ? handleDragEnd : undefined}
-      onTap={isTop ? () => navigate(`/recipe/${recipe.id}`) : undefined}
+      onTap={isTop ? handleTap : undefined}
     >
       <div className="relative h-full w-full overflow-hidden rounded-3xl bg-neutral-800 shadow-xl shadow-black/40">
         {recipe.image ? (
