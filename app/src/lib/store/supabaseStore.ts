@@ -1,117 +1,126 @@
 import { supabase } from '../supabaseClient'
 import { LocalStore } from './localStore'
 import type { SyncStore } from './types'
-import type { Swipe, SwipeDirection } from '../../types/recipe'
+import type { RecipePriority, SwipeDirection } from '../../types/recipe'
 
 const PENDING_KEY = 'recipe-app:pendingSwipes'
 
-interface SwipeRow {
-  user_id: string
-  recipe_id: string
+interface PendingSwipe {
+  userId: string
+  recipeId: string
   direction: SwipeDirection
-  swiped_at: string
+  deckId: string
 }
 
-function rowToSwipe(row: SwipeRow): Swipe {
+interface PriorityRow {
+  user_id: string
+  recipe_id: string
+  priority: number
+  favorited: boolean
+  removed_at: string | null
+  updated_at: string
+}
+
+function rowToPriority(row: PriorityRow): RecipePriority {
   return {
     userId: row.user_id,
     recipeId: row.recipe_id,
-    direction: row.direction,
-    swipedAt: row.swiped_at,
+    priority: row.priority,
+    favorited: row.favorited,
+    removedAt: row.removed_at,
+    updatedAt: row.updated_at,
   }
 }
 
-function readPending(): Swipe[] {
+function readPending(): PendingSwipe[] {
   const raw = localStorage.getItem(PENDING_KEY)
   if (!raw) return []
   try {
-    return JSON.parse(raw) as Swipe[]
+    return JSON.parse(raw) as PendingSwipe[]
   } catch {
     return []
   }
 }
 
-function writePending(swipes: Swipe[]) {
-  localStorage.setItem(PENDING_KEY, JSON.stringify(swipes))
+function writePending(pending: PendingSwipe[]) {
+  localStorage.setItem(PENDING_KEY, JSON.stringify(pending))
 }
 
 /**
- * Supabase-backed sync. The local store underneath serves two purposes:
- * an offline read cache (so the deck still loads with no network), and a
- * durable queue for swipes recorded while offline, retried on the next call
- * that touches the network — a swipe is never lost to a dropped connection,
- * just delayed in reaching the other phone.
+ * Supabase-backed sync via the `apply_swipe` RPC (does the priority
+ * arithmetic atomically server-side, so two devices hitting the same row
+ * can't race). The local store underneath serves two purposes: an offline
+ * read cache, and a durable queue of swipe *actions* (not results) recorded
+ * while offline, replayed through the same RPC once back online — a swipe
+ * is never lost to a dropped connection, just delayed in reaching the other
+ * phone.
  */
 export class SupabaseStore implements SyncStore {
   private cache = new LocalStore()
 
-  private async pushToSupabase(swipe: Swipe): Promise<boolean> {
-    const { error } = await supabase.from('swipes').upsert(
-      {
-        user_id: swipe.userId,
-        recipe_id: swipe.recipeId,
-        direction: swipe.direction,
-        swiped_at: swipe.swipedAt,
-      },
-      { onConflict: 'user_id,recipe_id' },
-    )
-    if (error) console.warn('Supabase upsert failed', error)
-    return !error
+  private async callApplySwipe(swipe: PendingSwipe): Promise<RecipePriority | null> {
+    const { data, error } = await supabase.rpc('apply_swipe', {
+      p_user_id: swipe.userId,
+      p_recipe_id: swipe.recipeId,
+      p_direction: swipe.direction,
+      p_deck_id: swipe.deckId,
+    })
+    if (error) {
+      console.warn('apply_swipe RPC failed', error)
+      return null
+    }
+    return rowToPriority(data as PriorityRow)
   }
 
   private async flushPending() {
     const pending = readPending()
     if (!pending.length) return
-    const stillPending: Swipe[] = []
+    const stillPending: PendingSwipe[] = []
     for (const swipe of pending) {
-      const ok = await this.pushToSupabase(swipe)
-      if (!ok) stillPending.push(swipe)
+      const result = await this.callApplySwipe(swipe)
+      if (!result) stillPending.push(swipe)
     }
     writePending(stillPending)
   }
 
-  async getSwipesForUser(userId: string): Promise<Swipe[]> {
+  async getPriorities(userId: string): Promise<RecipePriority[]> {
     await this.flushPending()
     try {
-      const { data, error } = await supabase.from('swipes').select('*').eq('user_id', userId)
+      const { data, error } = await supabase
+        .from('recipe_priority')
+        .select('*')
+        .eq('user_id', userId)
       if (error) throw error
-      const swipes = (data as SwipeRow[]).map(rowToSwipe)
-      for (const swipe of swipes) {
-        await this.cache.recordSwipe(swipe.userId, swipe.recipeId, swipe.direction)
+      const priorities = (data as PriorityRow[]).map(rowToPriority)
+      for (const p of priorities) {
+        await this.cache.setPriority(p)
       }
-      return swipes
+      return priorities
     } catch (err) {
       console.warn('Supabase fetch failed, falling back to local cache', err)
-      return this.cache.getSwipesForUser(userId)
+      return this.cache.getPriorities(userId)
     }
   }
 
-  async getAllSwipes(): Promise<Swipe[]> {
-    await this.flushPending()
-    try {
-      const { data, error } = await supabase.from('swipes').select('*')
-      if (error) throw error
-      const swipes = (data as SwipeRow[]).map(rowToSwipe)
-      for (const swipe of swipes) {
-        await this.cache.recordSwipe(swipe.userId, swipe.recipeId, swipe.direction)
-      }
-      return swipes
-    } catch (err) {
-      console.warn('Supabase fetch failed, falling back to local cache', err)
-      return this.cache.getAllSwipes()
-    }
-  }
+  async applySwipe(
+    userId: string,
+    recipeId: string,
+    direction: SwipeDirection,
+    deckId: string,
+  ): Promise<RecipePriority> {
+    // Optimistic local update first so the UI never waits on the network.
+    const optimistic = await this.cache.applySwipe(userId, recipeId, direction, deckId)
 
-  async recordSwipe(userId: string, recipeId: string, direction: SwipeDirection): Promise<Swipe> {
-    const swipe = await this.cache.recordSwipe(userId, recipeId, direction)
-    const ok = await this.pushToSupabase(swipe)
-    if (!ok) {
+    const result = await this.callApplySwipe({ userId, recipeId, direction, deckId })
+    if (!result) {
       const pending = readPending().filter(
         (s) => !(s.userId === userId && s.recipeId === recipeId),
       )
-      writePending([...pending, swipe])
+      writePending([...pending, { userId, recipeId, direction, deckId }])
+      return optimistic
     }
-    return swipe
+    await this.cache.setPriority(result)
+    return result
   }
 }
 

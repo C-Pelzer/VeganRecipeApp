@@ -1,14 +1,18 @@
-import type { Swipe, SwipeDirection } from '../../types/recipe'
+import type { RecipePriority, SwipeDirection } from '../../types/recipe'
 
 /**
  * Everything that needs to sync between the two phones goes through this
- * interface. `LocalStore` (localStorage-backed) is the only implementation
- * today; a Supabase-backed implementation can replace it later without any
- * UI changes, since match detection needs both users' swipes in one place
- * and this device can only see its own for now.
+ * interface. Favorites and shared-favorites aren't separate store methods —
+ * they're derived client-side from getPriorities() for each household member,
+ * same as deck-eligibility filtering already lives in DeckScreen rather than
+ * the store.
  */
 export interface SyncStore {
-  getSwipesForUser(userId: string): Promise<Swipe[]>
-  getAllSwipes(): Promise<Swipe[]>
-  recordSwipe(userId: string, recipeId: string, direction: SwipeDirection): Promise<Swipe>
+  getPriorities(userId: string): Promise<RecipePriority[]>
+  applySwipe(
+    userId: string,
+    recipeId: string,
+    direction: SwipeDirection,
+    deckId: string,
+  ): Promise<RecipePriority>
 }

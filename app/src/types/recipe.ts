@@ -59,11 +59,36 @@ export interface Recipe {
   hasSteps: boolean
 }
 
-export type SwipeDirection = 'left' | 'right'
+export type SwipeDirection = 'left' | 'right' | 'down'
 
-export interface Swipe {
+/** One swipe action. Repeatable per (user, recipe) now — recipes resurface, they aren't one-shot. */
+export interface SwipeEvent {
   recipeId: string
   userId: string
   direction: SwipeDirection
+  deckId: string
   swipedAt: string // ISO timestamp
+}
+
+/**
+ * Materialized current state per (user, recipe) — what the deck and favorites
+ * logic actually read. Starts at priority 5 on first swipe; right +1 and marks
+ * favorited (sticky — never unset by a later left swipe); left -1; down or
+ * priority <= 0 sets removedAt, which takes the recipe out of that user's deck
+ * pool for good.
+ */
+export interface RecipePriority {
+  userId: string
+  recipeId: string
+  priority: number
+  favorited: boolean
+  removedAt: string | null
+  updatedAt: string
+}
+
+/** A named filter over the recipe pool — "New", "Everything", more later. */
+export interface Deck {
+  id: string
+  label: string
+  isEligible: (recipe: Recipe, priority: RecipePriority | undefined) => boolean
 }

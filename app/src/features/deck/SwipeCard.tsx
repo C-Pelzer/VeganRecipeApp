@@ -21,9 +21,11 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
   ref,
 ) {
   const x = useMotionValue(0)
+  const y = useMotionValue(0)
   const rotate = useTransform(x, [-300, 300], [-12, 12])
   const likeOpacity = useTransform(x, [20, 120], [0, 1])
   const nopeOpacity = useTransform(x, [-120, -20], [1, 0])
+  const removeOpacity = useTransform(y, [20, 120], [0, 1])
   const controls = useAnimation()
   // A rapid double-tap/drag can call this again before the card's own state
   // updates unmount it — without this guard, the fly-off animation restarts
@@ -33,35 +35,50 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
   async function flyOffScreen(direction: SwipeDirection) {
     if (hasSwipedRef.current) return
     hasSwipedRef.current = true
-    await controls.start({
-      x: direction === 'right' ? 600 : -600,
-      rotate: direction === 'right' ? 20 : -20,
-      opacity: 0,
-      transition: { duration: 0.2 },
-    })
+    const exit =
+      direction === 'down'
+        ? { y: 700, transition: { duration: 0.2 } }
+        : { x: direction === 'right' ? 600 : -600, rotate: direction === 'right' ? 20 : -20, transition: { duration: 0.2 } }
+    await controls.start({ ...exit, opacity: 0 })
     onSwipe(recipe.id, direction)
   }
 
   useImperativeHandle(ref, () => ({ triggerSwipe: flyOffScreen }))
 
   async function handleDragEnd(_event: unknown, info: PanInfo) {
-    const passedThreshold = Math.abs(info.offset.x) > SWIPE_THRESHOLD
-    const passedVelocity = Math.abs(info.velocity.x) > VELOCITY_THRESHOLD
-    if (passedThreshold || passedVelocity) {
-      await flyOffScreen(info.offset.x > 0 ? 'right' : 'left')
-      return
+    const horizontal = Math.abs(info.offset.x) > Math.abs(info.offset.y)
+
+    if (horizontal) {
+      const passedThreshold = Math.abs(info.offset.x) > SWIPE_THRESHOLD
+      const passedVelocity = Math.abs(info.velocity.x) > VELOCITY_THRESHOLD
+      if (passedThreshold || passedVelocity) {
+        await flyOffScreen(info.offset.x > 0 ? 'right' : 'left')
+        return
+      }
+    } else {
+      const passedThreshold = info.offset.y > SWIPE_THRESHOLD
+      const passedVelocity = info.velocity.y > VELOCITY_THRESHOLD
+      if (passedThreshold || passedVelocity) {
+        await flyOffScreen('down')
+        return
+      }
     }
-    controls.start({ x: 0, rotate: 0, transition: { type: 'spring', stiffness: 400, damping: 30 } })
+    controls.start({
+      x: 0,
+      y: 0,
+      rotate: 0,
+      transition: { type: 'spring', stiffness: 400, damping: 30 },
+    })
   }
 
   return (
     <motion.div
       className="absolute inset-0 touch-none select-none"
-      style={{ x, rotate, zIndex: 10 - stackDepth }}
+      style={{ x, y, rotate, zIndex: 10 - stackDepth }}
       animate={isTop ? controls : { scale: 1 - stackDepth * 0.04, y: stackDepth * 10 }}
       initial={{ scale: 1 - stackDepth * 0.04, y: stackDepth * 10 }}
-      drag={isTop ? 'x' : false}
-      dragConstraints={{ left: 0, right: 0 }}
+      drag={isTop}
+      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
       dragElastic={1}
       onDragEnd={isTop ? handleDragEnd : undefined}
     >
@@ -94,6 +111,12 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
               className="absolute right-6 top-6 rotate-12 rounded-lg border-4 border-rose-500 px-4 py-1 text-2xl font-black tracking-wider text-rose-500"
             >
               PASS
+            </motion.div>
+            <motion.div
+              style={{ opacity: removeOpacity }}
+              className="absolute left-1/2 top-6 -translate-x-1/2 rounded-lg border-4 border-neutral-400 px-4 py-1 text-2xl font-black tracking-wider text-neutral-300"
+            >
+              REMOVE
             </motion.div>
           </>
         )}
