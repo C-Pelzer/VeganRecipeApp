@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { DeckScreen } from './features/deck/DeckScreen'
+import { FavoritesScreen } from './features/favorites/FavoritesScreen'
 import { ProfilePicker } from './features/profile/ProfilePicker'
 import { getCurrentUser, setCurrentUser, type HouseholdMember } from './lib/profile'
 
@@ -14,7 +16,12 @@ function App() {
   return (
     <div className="h-full min-h-screen bg-neutral-950">
       {currentUser ? (
-        <DeckScreen currentUser={currentUser} />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<DeckScreen currentUser={currentUser} />} />
+            <Route path="/favorites" element={<FavoritesScreen currentUser={currentUser} />} />
+          </Routes>
+        </BrowserRouter>
       ) : (
         <ProfilePicker onSelect={handleSelect} />
       )}

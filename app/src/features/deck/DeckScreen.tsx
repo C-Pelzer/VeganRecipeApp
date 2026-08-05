@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useRecipes } from '../../lib/data'
 import { store } from '../../lib/store/supabaseStore'
 import type { HouseholdMember } from '../../lib/profile'
@@ -104,7 +105,12 @@ export function DeckScreen({ currentUser }: DeckScreenProps) {
   return (
     <div className="flex h-full flex-col p-4">
       <div className="mb-3 flex items-center justify-between text-sm text-white/50">
-        <span>{currentUser}</span>
+        <div className="flex items-center gap-2">
+          <span>{currentUser}</span>
+          <Link to="/favorites" aria-label="Favorites" className="text-base leading-none">
+            ★
+          </Link>
+        </div>
         <div className="flex gap-1 rounded-full bg-neutral-900 p-1">
           {DECKS.map((d) => (
             <button
