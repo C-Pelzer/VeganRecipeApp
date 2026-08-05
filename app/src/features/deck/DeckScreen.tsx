@@ -2,15 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useRecipes } from '../../lib/data'
 import { store } from '../../lib/store/supabaseStore'
 import type { HouseholdMember } from '../../lib/profile'
-import type { Recipe, RecipePriority, SwipeDirection } from '../../types/recipe'
+import type { Deck, Recipe, RecipePriority, SwipeDirection } from '../../types/recipe'
 import { SwipeCard, type SwipeCardHandle } from './SwipeCard'
+import { DECKS, DEFAULT_DECK } from './decks'
 
 const VISIBLE_STACK_SIZE = 3
-
-// Deck variety (item 2) lands in a later pass — for now everyone gets the same
-// pool, tagged with a fixed deck id so swipe_events already carries the field
-// deck filtering will need.
-const DEFAULT_DECK_ID = 'everything'
 
 // Sub-recipes (isComponent) and recipes with no method steps at all (a broken
 // extraction, not just an incomplete one) don't belong in the swipe deck.
@@ -22,20 +18,19 @@ function isDeckEligible(recipe: Recipe): boolean {
 // item 10) — a recipe only leaves the pool for good once removedAt is set
 // (priority hit 0, or an explicit down-swipe). Never-swiped recipes come first
 // so a session favors fresh content; already-swiped-but-not-removed recipes
-// fill in once that runs out.
-function buildQueue(recipes: Recipe[], priorities: RecipePriority[]): Recipe[] {
+// fill in once that runs out (irrelevant for a deck like "New" whose own filter
+// only ever admits unswiped recipes anyway).
+function buildQueue(recipes: Recipe[], priorities: RecipePriority[], deck: Deck): Recipe[] {
   const byId = new Map(priorities.map((p) => [p.recipeId, p]))
   const unseen: Recipe[] = []
   const resurfaced: Recipe[] = []
   for (const recipe of recipes) {
     if (!isDeckEligible(recipe)) continue
     const priority = byId.get(recipe.id)
-    if (!priority) {
-      unseen.push(recipe)
-      continue
-    }
-    if (priority.removedAt) continue
-    resurfaced.push(recipe)
+    if (priority?.removedAt) continue
+    if (!deck.isEligible(recipe, priority)) continue
+    if (!priority) unseen.push(recipe)
+    else resurfaced.push(recipe)
   }
   return [...unseen, ...resurfaced]
 }
@@ -46,26 +41,43 @@ interface DeckScreenProps {
 
 export function DeckScreen({ currentUser }: DeckScreenProps) {
   const { recipes, error } = useRecipes()
+  // priorities (state) only signals "loaded, safe to build a queue" — the actual
+  // data lives in the ref below, kept current on every swipe without forcing a
+  // queue rebuild (a rebuild is only wanted on deck switch, not mid-session).
   const [priorities, setPriorities] = useState<RecipePriority[] | null>(null)
+  const prioritiesRef = useRef<RecipePriority[]>([])
+  const [deck, setDeck] = useState<Deck>(DEFAULT_DECK)
   const [queue, setQueue] = useState<Recipe[]>([])
   // Session progress, not lifetime — a recipe can be swiped many times across
-  // sessions now, so "reviewed / total" only makes sense per-session.
+  // sessions now, so "reviewed / total" only makes sense per-session. Resets
+  // whenever the deck changes, since that's effectively a new session.
   const [sessionTotal, setSessionTotal] = useState<number | null>(null)
   const topCardRef = useRef<SwipeCardHandle>(null)
 
   useEffect(() => {
-    store.getPriorities(currentUser).then(setPriorities)
+    store.getPriorities(currentUser).then((p) => {
+      prioritiesRef.current = p
+      setPriorities(p)
+    })
   }, [currentUser])
 
   useEffect(() => {
     if (!recipes || !priorities) return
-    const nextQueue = buildQueue(recipes, priorities)
+    const nextQueue = buildQueue(recipes, prioritiesRef.current, deck)
     setQueue(nextQueue)
-    setSessionTotal((prev) => prev ?? nextQueue.length)
-  }, [recipes, priorities])
+    setSessionTotal(nextQueue.length)
+    // priorities itself is intentionally not re-read here beyond the "loaded"
+    // check — see the comment above the ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recipes, priorities, deck])
 
   function handleSwipe(recipeId: string, direction: SwipeDirection) {
-    store.applySwipe(currentUser, recipeId, direction, DEFAULT_DECK_ID)
+    store.applySwipe(currentUser, recipeId, direction, deck.id).then((result) => {
+      prioritiesRef.current = [
+        ...prioritiesRef.current.filter((p) => p.recipeId !== recipeId),
+        result,
+      ]
+    })
     // Filter by id rather than slicing the front — correct even if this fires
     // out of order relative to the queue's current state.
     setQueue((q) => q.filter((r) => r.id !== recipeId))
@@ -93,6 +105,20 @@ export function DeckScreen({ currentUser }: DeckScreenProps) {
     <div className="flex h-full flex-col p-4">
       <div className="mb-3 flex items-center justify-between text-sm text-white/50">
         <span>{currentUser}</span>
+        <div className="flex gap-1 rounded-full bg-neutral-900 p-1">
+          {DECKS.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => setDeck(d)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                d.id === deck.id ? 'bg-neutral-700 text-white' : 'text-white/50'
+              }`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
         <span>
           {reviewed} / {sessionTotal}
         </span>
@@ -101,7 +127,9 @@ export function DeckScreen({ currentUser }: DeckScreenProps) {
       <div className="relative flex-1">
         {visible.length === 0 ? (
           <div className="flex h-full items-center justify-center text-center text-white/60">
-            That's every recipe for now — check back once more books are processed.
+            {deck.id === 'new'
+              ? "You've seen everything in this deck — try Everything, or check back once more books are processed."
+              : "That's every recipe for now — check back once more books are processed."}
           </div>
         ) : (
           visible
