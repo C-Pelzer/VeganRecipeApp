@@ -18,3 +18,9 @@ export function sharedFavoriteIds(a: Set<string>, b: Set<string>): Set<string> {
   }
   return shared
 }
+
+/** Either person's favorite counts — used where the picker should offer the
+ * whole household's pool (e.g. the meal calendar), not just one person's. */
+export function unionFavoriteIds(a: Set<string>, b: Set<string>): Set<string> {
+  return new Set([...a, ...b])
+}

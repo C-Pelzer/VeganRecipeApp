@@ -76,6 +76,15 @@ export function NavDrawer({ isOpen, onClose, currentUser, onSwitchUser }: NavDra
                 <NavLink to="/meal-plan" onClick={onClose} className={navLinkClass}>
                   📋 Meal Plan
                 </NavLink>
+                <NavLink to="/meal-calendar" onClick={onClose} className={navLinkClass}>
+                  📅 Meal Calendar
+                </NavLink>
+                <NavLink to="/import" onClick={onClose} className={navLinkClass}>
+                  🔗 Import Recipe
+                </NavLink>
+                <NavLink to="/catalog" onClick={onClose} className={navLinkClass}>
+                  🔍 Catalog
+                </NavLink>
               </nav>
 
               <div className="flex flex-col gap-1">

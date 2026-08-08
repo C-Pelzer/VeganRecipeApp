@@ -7,6 +7,9 @@ import { DeckScreen } from './features/deck/DeckScreen'
 import { FavoritesScreen } from './features/favorites/FavoritesScreen'
 import { ShoppingListScreen } from './features/shoppingList/ShoppingListScreen'
 import { MealPlanScreen } from './features/mealPlan/MealPlanScreen'
+import { MealCalendarScreen } from './features/mealCalendar/MealCalendarScreen'
+import { ImportRecipeScreen } from './features/importRecipe/ImportRecipeScreen'
+import { CatalogScreen } from './features/catalog/CatalogScreen'
 import { ProfilePicker } from './features/profile/ProfilePicker'
 import { clearCurrentUser, getCurrentUser, setCurrentUser, type HouseholdMember } from './lib/profile'
 
@@ -68,6 +71,26 @@ function App() {
               element={
                 <MealPlanScreen onOpenMenu={() => setMenuOpen(true)} onViewRecipe={setViewingRecipeId} />
               }
+            />
+            <Route
+              path="/meal-calendar"
+              element={
+                <MealCalendarScreen onOpenMenu={() => setMenuOpen(true)} onViewRecipe={setViewingRecipeId} />
+              }
+            />
+            <Route
+              path="/import"
+              element={
+                <ImportRecipeScreen
+                  currentUser={currentUser}
+                  onOpenMenu={() => setMenuOpen(true)}
+                  onViewRecipe={setViewingRecipeId}
+                />
+              }
+            />
+            <Route
+              path="/catalog"
+              element={<CatalogScreen onOpenMenu={() => setMenuOpen(true)} onViewRecipe={setViewingRecipeId} />}
             />
           </Routes>
         </BrowserRouter>

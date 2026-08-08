@@ -1,6 +1,8 @@
 // Mirrors the schema documented in CLAUDE_CODE_BRIEF.md. Keep in sync with
 // scripts/build-bundle.mjs, which is the only thing that produces this shape.
 
+import type { HouseholdMember } from '../lib/profile'
+
 export type GramsSource =
   | 'book'
   | 'book-package'
@@ -129,5 +131,16 @@ export interface RecipeOverride {
   notes: string
   ingredientsOverride: string
   stepsOverride: string
+  updatedAt: string
+}
+
+export type MealType = 'breakfast' | 'lunch' | 'dinner'
+
+/** One filled calendar slot — a recipe + assigned person on a given date (scripts/schema-meal-calendar.sql). */
+export interface MealCalendarEntry {
+  entryDate: string // YYYY-MM-DD
+  mealType: MealType
+  recipeId: string
+  assignedTo: HouseholdMember
   updatedAt: string
 }
