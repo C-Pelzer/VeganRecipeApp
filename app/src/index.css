@@ -8,6 +8,11 @@ html,
 body,
 #root {
   height: 100%;
+  /* Static 100% tracks the largest possible viewport on mobile, which is
+     taller than what's actually visible once the browser's URL bar/nav
+     buttons are showing — dvh tracks the real visible area instead.
+     Browsers without dvh support ignore this line and keep the 100% above. */
+  height: 100dvh;
   margin: 0;
 }
 

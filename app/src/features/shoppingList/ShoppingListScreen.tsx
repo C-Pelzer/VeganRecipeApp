@@ -90,7 +90,7 @@ export function ShoppingListScreen({ onOpenMenu }: ShoppingListScreenProps) {
     .sort((a, b) => Number(a.checked) - Number(b.checked) || a.itemKey.localeCompare(b.itemKey))
 
   return (
-    <div className="flex h-full flex-col p-4">
+    <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div className="mb-4 flex items-center justify-between text-sm">
         <button
           type="button"

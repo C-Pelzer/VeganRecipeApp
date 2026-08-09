@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
-import type { RecipeTag, TagCategory } from '../types/recipe'
+import type { RecipeTag, RecipeTagOverride, TagCategory } from '../types/recipe'
 
 let cache: Promise<RecipeTag[]> | null = null
 
@@ -51,7 +51,72 @@ export function useRecipeTags(): UseRecipeTagsResult {
   return { tags, error }
 }
 
-const CATEGORY_ORDER: TagCategory[] = ['time', 'cuisine', 'ingredient']
+let overrideCache: Promise<RecipeTagOverride[]> | null = null
+
+/**
+ * Fetches the full recipe_tag_overrides table (see
+ * app/src/lib/store/recipeTagOverrideStore.ts, which writes to it). Same
+ * whole-table caching pattern as useRecipeTags — invalidated on write via
+ * invalidateTagOverrides() since, unlike the pipeline tables, this one
+ * changes during a session.
+ */
+async function fetchOverrides(): Promise<RecipeTagOverride[]> {
+  const { data, error } = await supabase.from('recipe_tag_overrides').select('*')
+  if (error) throw error
+  return (data ?? []).map((row) => ({
+    recipeId: row.recipe_id,
+    category: row.category,
+    tagSlug: row.tag_slug,
+    label: row.label,
+    action: row.action,
+    updatedAt: row.updated_at,
+  }))
+}
+
+const overrideRefetchListeners = new Set<() => void>()
+
+export function invalidateTagOverrides() {
+  overrideCache = null
+  for (const listener of overrideRefetchListeners) listener()
+}
+
+function loadOverrides(): Promise<RecipeTagOverride[]> {
+  if (!overrideCache) overrideCache = fetchOverrides()
+  return overrideCache
+}
+
+interface UseRecipeTagOverridesResult {
+  overrides: RecipeTagOverride[] | null
+  error: Error | null
+}
+
+export function useRecipeTagOverrides(): UseRecipeTagOverridesResult {
+  const [overrides, setOverrides] = useState<RecipeTagOverride[] | null>(null)
+  const [error, setError] = useState<Error | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    function load() {
+      loadOverrides()
+        .then((data) => {
+          if (!cancelled) setOverrides(data)
+        })
+        .catch((err) => {
+          if (!cancelled) setError(err instanceof Error ? err : new Error(String(err)))
+        })
+    }
+    load()
+    overrideRefetchListeners.add(load)
+    return () => {
+      cancelled = true
+      overrideRefetchListeners.delete(load)
+    }
+  }, [])
+
+  return { overrides, error }
+}
+
+const CATEGORY_ORDER: TagCategory[] = ['time', 'cuisine', 'ingredient', 'course']
 
 /** Distinct (slug, label) pairs per category, in a fixed display order. */
 export function groupByCategory(tags: RecipeTag[]): Record<TagCategory, { slug: string; label: string }[]> {
@@ -71,11 +136,40 @@ export function groupByCategory(tags: RecipeTag[]): Record<TagCategory, { slug: 
   return result
 }
 
-export function tagSlugsByRecipe(tags: RecipeTag[]): Map<string, Set<string>> {
-  const map = new Map<string, Set<string>>()
-  for (const tag of tags) {
-    if (!map.has(tag.recipeId)) map.set(tag.recipeId, new Set())
-    map.get(tag.recipeId)?.add(tag.tagSlug)
+/**
+ * Per-recipe effective tags: pipeline tags with any 'remove' overrides
+ * dropped and any 'add' overrides folded in. Mirrors the merge the pipeline
+ * itself does in scripts/build-swipe-decks.mjs, so a recipe's tag editor
+ * (RecipeDetailModal) shows exactly what the next deck rebuild would see.
+ */
+export function effectiveTagsByRecipe(
+  tags: RecipeTag[],
+  overrides: RecipeTagOverride[],
+): Map<string, RecipeTag[]> {
+  const byRecipe = new Map<string, Map<string, RecipeTag>>()
+
+  function recipeMap(recipeId: string): Map<string, RecipeTag> {
+    if (!byRecipe.has(recipeId)) byRecipe.set(recipeId, new Map())
+    return byRecipe.get(recipeId) as Map<string, RecipeTag>
   }
-  return map
+
+  for (const tag of tags) {
+    recipeMap(tag.recipeId).set(`${tag.category}::${tag.tagSlug}`, tag)
+  }
+  for (const override of overrides) {
+    const key = `${override.category}::${override.tagSlug}`
+    const map = recipeMap(override.recipeId)
+    if (override.action === 'remove') map.delete(key)
+    else
+      map.set(key, {
+        recipeId: override.recipeId,
+        category: override.category,
+        tagSlug: override.tagSlug,
+        label: override.label,
+      })
+  }
+
+  const result = new Map<string, RecipeTag[]>()
+  for (const [recipeId, map] of byRecipe) result.set(recipeId, [...map.values()])
+  return result
 }

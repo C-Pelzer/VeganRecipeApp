@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useRecipes } from '../../lib/data'
 import { store } from '../../lib/store/supabaseStore'
-import { tagSlugsByRecipe, useRecipeTags } from '../../lib/tags'
+import { deckStore } from '../../lib/store/deckStore'
 import type { HouseholdMember } from '../../lib/profile'
 import type { Deck, Recipe, RecipePriority, SwipeDirection } from '../../types/recipe'
 import { SwipeCard, type SwipeCardHandle } from './SwipeCard'
-import { DECKS, DEFAULT_DECK, tagDeck } from './decks'
+import { DECKS, DEFAULT_DECK } from './decks'
 
 const VISIBLE_STACK_SIZE = 3
 
@@ -35,12 +35,7 @@ function shuffle<T>(items: T[]): T[] {
 // so a session favors fresh content; already-swiped-but-not-removed recipes
 // fill in once that runs out (irrelevant for a deck like "New" whose own filter
 // only ever admits unswiped recipes anyway).
-function buildQueue(
-  recipes: Recipe[],
-  priorities: RecipePriority[],
-  deck: Deck,
-  tagsByRecipe: Map<string, Set<string>>,
-): Recipe[] {
+function buildQueue(recipes: Recipe[], priorities: RecipePriority[], deck: Deck): Recipe[] {
   const byId = new Map(priorities.map((p) => [p.recipeId, p]))
   const unseen: Recipe[] = []
   const resurfaced: Recipe[] = []
@@ -48,15 +43,12 @@ function buildQueue(
     if (!isDeckEligible(recipe)) continue
     const priority = byId.get(recipe.id)
     if (priority?.removedAt) continue
-    if (!deck.isEligible(recipe, priority, tagsByRecipe.get(recipe.id) ?? EMPTY_TAG_SET)) continue
+    if (!deck.isEligible(recipe, priority)) continue
     if (!priority) unseen.push(recipe)
     else resurfaced.push(recipe)
   }
   return [...shuffle(unseen), ...shuffle(resurfaced)]
 }
-
-const EMPTY_TAG_SET = new Set<string>()
-const EMPTY_TAGS_BY_RECIPE = new Map<string, Set<string>>()
 
 interface DeckScreenProps {
   currentUser: HouseholdMember
@@ -67,18 +59,45 @@ interface DeckScreenProps {
 export function DeckScreen({ currentUser, onOpenMenu, onViewRecipe }: DeckScreenProps) {
   const { deckId } = useParams<{ deckId: string }>()
   const { recipes, error } = useRecipes()
-  const { tags, error: tagsError } = useRecipeTags()
-  const tagsByRecipe = useMemo(() => (tags ? tagSlugsByRecipe(tags) : EMPTY_TAGS_BY_RECIPE), [tags])
-  // Memoized so a tag-based deck (built fresh via tagDeck()) keeps a stable
-  // object identity across renders — otherwise the queue-rebuild effect below
-  // (which depends on `deck`) would see a "new" deck every render and loop
-  // forever re-triggering itself.
-  const deck: Deck = useMemo(() => {
-    const staticDeck = DECKS.find((d) => d.id === deckId)
+  const staticDeck = useMemo(() => DECKS.find((d) => d.id === deckId), [deckId])
+
+  // Persisted decks (tag-derived or hand-built in the Catalog deck builder)
+  // are a fixed, fetched recipe-id set rather than a live filter — fetched
+  // by id whenever deckId doesn't match one of the two static pseudo-decks
+  // above. `recipeIds` is kept as a Set so isEligible below stays a stable
+  // closure across renders once the fetch resolves.
+  const [persistedDeck, setPersistedDeck] = useState<{ label: string; recipeIds: Set<string> } | null>(null)
+  const [persistedDeckLoaded, setPersistedDeckLoaded] = useState(false)
+  const [deckError, setDeckError] = useState<Error | null>(null)
+
+  useEffect(() => {
+    if (staticDeck || !deckId) return
+    setPersistedDeckLoaded(false)
+    setPersistedDeck(null)
+    deckStore
+      .getDeck(deckId)
+      .then((result) => {
+        setPersistedDeck(result ? { label: result.deck.label, recipeIds: new Set(result.recipeIds) } : null)
+      })
+      .catch((err) => setDeckError(err instanceof Error ? err : new Error(String(err))))
+      .finally(() => setPersistedDeckLoaded(true))
+  }, [deckId, staticDeck])
+
+  // Memoized so the queue-rebuild effect below (which depends on `deck`)
+  // doesn't see a "new" deck every render and loop forever re-triggering
+  // itself once the persisted fetch resolves.
+  const deck: Deck | null = useMemo(() => {
     if (staticDeck) return staticDeck
-    const matchingTag = tags?.find((t) => t.tagSlug === deckId)
-    return matchingTag ? tagDeck({ slug: matchingTag.tagSlug, label: matchingTag.label }) : DEFAULT_DECK
-  }, [deckId, tags])
+    if (!deckId) return DEFAULT_DECK
+    if (!persistedDeckLoaded) return null
+    if (!persistedDeck) return DEFAULT_DECK // stale/unknown deck id — fall back rather than erroring
+    return {
+      id: deckId,
+      label: persistedDeck.label,
+      isEligible: (recipe) => persistedDeck.recipeIds.has(recipe.id),
+    }
+  }, [staticDeck, deckId, persistedDeckLoaded, persistedDeck])
+
   // priorities (state) only signals "loaded, safe to build a queue" — the actual
   // data lives in the ref below, kept current on every swipe without forcing a
   // queue rebuild (a rebuild is only wanted on deck switch, not mid-session).
@@ -99,16 +118,17 @@ export function DeckScreen({ currentUser, onOpenMenu, onViewRecipe }: DeckScreen
   }, [currentUser])
 
   useEffect(() => {
-    if (!recipes || !priorities || !tags) return
-    const nextQueue = buildQueue(recipes, prioritiesRef.current, deck, tagsByRecipe)
+    if (!recipes || !priorities || !deck) return
+    const nextQueue = buildQueue(recipes, prioritiesRef.current, deck)
     setQueue(nextQueue)
     setSessionTotal(nextQueue.length)
     // priorities itself is intentionally not re-read here beyond the "loaded"
     // check — see the comment above the ref.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recipes, priorities, tags, deck])
+  }, [recipes, priorities, deck])
 
   function handleSwipe(recipeId: string, direction: SwipeDirection) {
+    if (!deck) return
     store.applySwipe(currentUser, recipeId, direction, deck.id).then((result) => {
       prioritiesRef.current = [
         ...prioritiesRef.current.filter((p) => p.recipeId !== recipeId),
@@ -120,7 +140,7 @@ export function DeckScreen({ currentUser, onOpenMenu, onViewRecipe }: DeckScreen
     setQueue((q) => q.filter((r) => r.id !== recipeId))
   }
 
-  if (error || tagsError) {
+  if (error || deckError) {
     return (
       <div className="flex h-full items-center justify-center p-6 text-center text-white/70">
         Couldn't load recipes. Try reloading — if you're offline, this page needs to have
@@ -129,7 +149,7 @@ export function DeckScreen({ currentUser, onOpenMenu, onViewRecipe }: DeckScreen
     )
   }
 
-  if (!recipes || !priorities || !tags || sessionTotal === null) {
+  if (!recipes || !priorities || !deck || sessionTotal === null) {
     return (
       <div className="flex h-full items-center justify-center text-white/50">Loading recipes…</div>
     )
@@ -139,7 +159,7 @@ export function DeckScreen({ currentUser, onOpenMenu, onViewRecipe }: DeckScreen
   const reviewed = sessionTotal - queue.length
 
   return (
-    <div className="flex h-full flex-col p-4">
+    <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div className="mb-3 flex items-center justify-between text-sm text-white/50">
         <button
           type="button"

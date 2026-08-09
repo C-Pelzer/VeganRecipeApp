@@ -93,7 +93,7 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
   }
 
   return (
-    <div className="relative flex h-full flex-col p-4">
+    <div className="relative flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div className="mb-4 flex items-center justify-between text-sm">
         <button
           type="button"
@@ -173,7 +173,7 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
           type="button"
           onClick={handleAddToShoppingList}
           disabled={addingToList}
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-neutral-950 shadow-lg disabled:opacity-60"
+          className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-neutral-950 shadow-lg disabled:opacity-60"
         >
           {addingToList ? 'Adding…' : `Add ${selectedIds.size} to Shopping List`}
         </button>

@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { NavDrawer } from './components/NavDrawer'
 import { RecipeDetailModal } from './components/RecipeDetailModal'
-import { DEFAULT_DECK } from './features/deck/decks'
 import { DeckScreen } from './features/deck/DeckScreen'
+import { DecksHomeScreen } from './features/decksHome/DecksHomeScreen'
 import { FavoritesScreen } from './features/favorites/FavoritesScreen'
 import { ShoppingListScreen } from './features/shoppingList/ShoppingListScreen'
 import { MealPlanScreen } from './features/mealPlan/MealPlanScreen'
@@ -30,7 +30,7 @@ function App() {
   }
 
   return (
-    <div className="h-full min-h-screen bg-neutral-950">
+    <div className="h-full bg-neutral-950">
       {currentUser ? (
         <BrowserRouter>
           <NavDrawer
@@ -41,7 +41,10 @@ function App() {
           />
           <RecipeDetailModal recipeId={viewingRecipeId} onClose={() => setViewingRecipeId(null)} />
           <Routes>
-            <Route path="/" element={<Navigate to={`/deck/${DEFAULT_DECK.id}`} replace />} />
+            <Route
+              path="/"
+              element={<DecksHomeScreen currentUser={currentUser} onOpenMenu={() => setMenuOpen(true)} />}
+            />
             <Route
               path="/deck/:deckId"
               element={
@@ -90,7 +93,13 @@ function App() {
             />
             <Route
               path="/catalog"
-              element={<CatalogScreen onOpenMenu={() => setMenuOpen(true)} onViewRecipe={setViewingRecipeId} />}
+              element={
+                <CatalogScreen
+                  currentUser={currentUser}
+                  onOpenMenu={() => setMenuOpen(true)}
+                  onViewRecipe={setViewingRecipeId}
+                />
+              }
             />
           </Routes>
         </BrowserRouter>

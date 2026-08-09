@@ -146,7 +146,7 @@ export function MealSlotPicker({
               )}
             </div>
 
-            <div className="flex gap-2 border-t border-white/10 p-4">
+            <div className="flex gap-2 border-t border-white/10 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
               {initialEntry && (
                 <button
                   type="button"

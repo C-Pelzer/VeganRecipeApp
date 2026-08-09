@@ -6,7 +6,8 @@
     "extract-images": "node extract-images.mjs",
     "upload-images": "node --env-file=.env upload-images.mjs",
     "build-bundle": "node --env-file=.env build-bundle.mjs",
-    "tag-recipes": "node --env-file=.env tag-recipes.mjs"
+    "tag-recipes": "node --env-file=.env tag-recipes.mjs",
+    "build-swipe-decks": "node --env-file=.env build-swipe-decks.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.0",

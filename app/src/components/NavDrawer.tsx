@@ -1,9 +1,8 @@
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { NavLink } from 'react-router-dom'
-import { DECKS, DEFAULT_DECK } from '../features/deck/decks'
-import { groupByCategory, useRecipeTags } from '../lib/tags'
+import { deckStore } from '../lib/store/deckStore'
 import type { HouseholdMember } from '../lib/profile'
-import type { TagCategory } from '../types/recipe'
 
 interface NavDrawerProps {
   isOpen: boolean
@@ -17,15 +16,14 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? 'bg-neutral-800 text-white' : 'text-white/70'
   }`
 
-const CATEGORY_LABELS: Record<TagCategory, string> = {
-  time: 'Time',
-  cuisine: 'Cuisine',
-  ingredient: 'Ingredient',
-}
-
 export function NavDrawer({ isOpen, onClose, currentUser, onSwitchUser }: NavDrawerProps) {
-  const { tags } = useRecipeTags()
-  const tagsByCategory = groupByCategory(tags ?? [])
+  const [unseenCount, setUnseenCount] = useState(0)
+
+  useEffect(() => {
+    // Re-checked each time the drawer opens, so the badge clears once the
+    // deck it flags has actually been opened, without needing a live subscription.
+    if (isOpen) deckStore.getUnseenShareCount(currentUser).then(setUnseenCount)
+  }, [isOpen, currentUser])
 
   return (
     <AnimatePresence>
@@ -47,7 +45,7 @@ export function NavDrawer({ isOpen, onClose, currentUser, onSwitchUser }: NavDra
             transition={{ type: 'tween', duration: 0.2 }}
             className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-neutral-950 text-white"
           >
-            <div className="flex items-center justify-between p-4 text-sm">
+            <div className="flex items-center justify-between p-4 pt-[calc(1rem+env(safe-area-inset-top))] text-sm">
               <span className="font-medium">{currentUser}</span>
               <button
                 type="button"
@@ -62,10 +60,17 @@ export function NavDrawer({ isOpen, onClose, currentUser, onSwitchUser }: NavDra
               </button>
             </div>
 
-            <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-4 pb-4">
+            <div className="flex flex-1 flex-col gap-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
               <nav className="flex flex-col gap-1">
-                <NavLink to={`/deck/${DEFAULT_DECK.id}`} onClick={onClose} className={navLinkClass}>
-                  Deck
+                <NavLink to="/" onClick={onClose} className={navLinkClass}>
+                  <span className="inline-flex items-center gap-2">
+                    🏠 Decks
+                    {unseenCount > 0 && (
+                      <span className="rounded-full bg-emerald-500 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-950">
+                        {unseenCount}
+                      </span>
+                    )}
+                  </span>
                 </NavLink>
                 <NavLink to="/favorites" onClick={onClose} className={navLinkClass}>
                   ★ Favorites
@@ -86,39 +91,6 @@ export function NavDrawer({ isOpen, onClose, currentUser, onSwitchUser }: NavDra
                   🔍 Catalog
                 </NavLink>
               </nav>
-
-              <div className="flex flex-col gap-1">
-                <p className="px-3 text-xs font-medium uppercase tracking-wide text-white/40">
-                  Categories
-                </p>
-                {DECKS.map((d) => (
-                  <NavLink key={d.id} to={`/deck/${d.id}`} onClick={onClose} className={navLinkClass}>
-                    {d.label}
-                  </NavLink>
-                ))}
-              </div>
-
-              {(Object.keys(CATEGORY_LABELS) as TagCategory[]).map((category) => {
-                const categoryTags = tagsByCategory[category]
-                if (!categoryTags.length) return null
-                return (
-                  <div key={category} className="flex flex-col gap-1">
-                    <p className="px-3 text-xs font-medium uppercase tracking-wide text-white/40">
-                      {CATEGORY_LABELS[category]}
-                    </p>
-                    {categoryTags.map((tag) => (
-                      <NavLink
-                        key={tag.slug}
-                        to={`/deck/${tag.slug}`}
-                        onClick={onClose}
-                        className={navLinkClass}
-                      >
-                        {tag.label}
-                      </NavLink>
-                    ))}
-                  </div>
-                )
-              })}
             </div>
           </motion.div>
         </>

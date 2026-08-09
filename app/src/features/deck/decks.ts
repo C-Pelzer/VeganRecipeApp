@@ -1,7 +1,10 @@
 import type { Deck } from '../../types/recipe'
 
-// More deck types (cuisine, cook-time, ingredient — NewIdeas.txt item 2) land once
-// the underlying data supports them; see the plan for why those aren't here yet.
+// The only two decks that stay live filters rather than persisted rows —
+// "unswiped" and "everything" aren't a fixed set of 40, they're the whole
+// pool by definition. Tag-derived and hand-built decks are now persisted
+// swipe_decks rows (app/src/lib/store/deckStore.ts), looked up by DeckScreen
+// when a deckId doesn't match one of these two.
 export const DECKS: Deck[] = [
   {
     id: 'new',
@@ -16,12 +19,3 @@ export const DECKS: Deck[] = [
 ]
 
 export const DEFAULT_DECK = DECKS[1]
-
-/** Builds a Deck for a tag from the recipe_tags table (see app/src/lib/tags.ts). */
-export function tagDeck(tag: { slug: string; label: string }): Deck {
-  return {
-    id: tag.slug,
-    label: tag.label,
-    isEligible: (_recipe, _priority, tagSlugs) => tagSlugs.has(tag.slug),
-  }
-}

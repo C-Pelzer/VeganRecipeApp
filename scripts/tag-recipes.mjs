@@ -143,6 +143,36 @@ function cuisineTags(recipe) {
   return tags;
 }
 
+// --- Course tags ------------------------------------------------------
+// A recipe can match more than one course (e.g. a soup that's also an
+// appetizer) — same "leave untagged over guessing" philosophy as cuisine.
+
+const COURSE_KEYWORDS = {
+  Appetizer: ["appetizer", "starter", "dip", "finger food"],
+  Soup: ["soup", "stew", "chowder", "bisque"],
+  Salad: ["salad", "slaw"],
+  Entree: ["entree", "main course", "main dish"],
+  Side: ["side dish", "side"],
+  Dessert: ["dessert", "cake", "cookie", "pie", "brownie", "pudding", "ice cream"],
+  Breakfast: ["breakfast", "brunch", "pancake", "waffle", "granola", "oatmeal"],
+  Snack: ["snack"],
+  Beverage: ["smoothie", "cocktail", "beverage", "drink", "shake"],
+};
+
+const COURSE_PATTERNS = Object.entries(COURSE_KEYWORDS).map(([course, keywords]) => ({
+  course,
+  pattern: new RegExp(`\\b(${keywords.join("|")})\\b`, "i"),
+}));
+
+function courseTags(recipe) {
+  const text = `${recipe.title} ${recipe.headnote || ""}`;
+  const tags = [];
+  for (const { course, pattern } of COURSE_PATTERNS) {
+    if (pattern.test(text)) tags.push({ slug: slugify(course), label: course });
+  }
+  return tags;
+}
+
 // --- Main -----------------------------------------------------------------
 
 function buildRows(recipes) {
@@ -157,6 +187,10 @@ function buildRows(recipes) {
 
     for (const tag of cuisineTags(recipe)) {
       rows.push({ recipe_id: recipe.id, category: "cuisine", tag_slug: tag.slug, label: tag.label });
+    }
+
+    for (const tag of courseTags(recipe)) {
+      rows.push({ recipe_id: recipe.id, category: "course", tag_slug: tag.slug, label: tag.label });
     }
   }
   return rows;

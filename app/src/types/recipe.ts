@@ -88,21 +88,59 @@ export interface RecipePriority {
   updatedAt: string
 }
 
-/** A named filter over the recipe pool — "New", "Everything", more later. */
+/** A named filter over the recipe pool — "New", "Everything", or a persisted SwipeDeckSummary's membership. */
 export interface Deck {
   id: string
   label: string
-  isEligible: (recipe: Recipe, priority: RecipePriority | undefined, tagSlugs: Set<string>) => boolean
+  isEligible: (recipe: Recipe, priority: RecipePriority | undefined) => boolean
 }
 
 /** Pipeline-computed grouping (scripts/tag-recipes.mjs) — see scripts/schema-recipe-tags.sql. */
-export type TagCategory = 'time' | 'cuisine' | 'ingredient'
+export type TagCategory = 'time' | 'cuisine' | 'ingredient' | 'course'
 
 export interface RecipeTag {
   recipeId: string
   category: TagCategory
   tagSlug: string
   label: string
+}
+
+/**
+ * A household member's edit to a recipe's tags, layered on top of the
+ * pipeline-computed RecipeTag rows (scripts/schema-recipe-tag-overrides.sql).
+ * 'remove' drops an otherwise-auto tag; 'add' introduces one that isn't.
+ */
+export interface RecipeTagOverride {
+  recipeId: string
+  category: TagCategory
+  tagSlug: string
+  label: string
+  action: 'add' | 'remove'
+  updatedAt: string
+}
+
+/**
+ * A persisted, bounded (<=40 recipes) swipe deck (scripts/schema-swipe-decks.sql).
+ * 'auto' decks are one per tag, built by scripts/build-swipe-decks.mjs;
+ * 'manual' decks are hand-picked in the Catalog deck builder.
+ */
+export interface SwipeDeckSummary {
+  id: string
+  label: string
+  source: 'auto' | 'manual'
+  category: TagCategory | null
+  tagSlug: string | null
+  createdBy: HouseholdMember | 'system'
+  createdAt: string
+}
+
+/** An explicit "send this deck to the other household member" record. */
+export interface SwipeDeckShare {
+  deckId: string
+  sharedWith: HouseholdMember
+  sharedBy: HouseholdMember
+  sharedAt: string
+  seenAt: string | null
 }
 
 /** One line of the shared household shopping list (scripts/schema-shopping-list.sql). */

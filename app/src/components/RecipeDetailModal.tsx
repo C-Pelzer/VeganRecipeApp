@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useRecipes } from '../lib/data'
 import { recipeOverrideStore } from '../lib/store/recipeOverrideStore'
-import type { Ingredient, IngredientGroup, Recipe, RecipeOverride } from '../types/recipe'
+import { recipeTagOverrideStore } from '../lib/store/recipeTagOverrideStore'
+import { effectiveTagsByRecipe, groupByCategory, useRecipeTagOverrides, useRecipeTags } from '../lib/tags'
+import type { Ingredient, IngredientGroup, Recipe, RecipeOverride, TagCategory } from '../types/recipe'
 
 // One item/step per line, blank lines dropped.
 function splitLines(text: string): string[] {
@@ -15,6 +17,18 @@ function splitLines(text: string): string[] {
 function originalIngredientsText(recipe: Recipe): string {
   return recipe.ingredient_groups.flatMap((g) => g.ingredients.map((i) => i.display)).join('\n')
 }
+
+function slugify(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, '-')
+}
+
+const TAG_CATEGORY_LABELS: Record<TagCategory, string> = {
+  time: 'Time',
+  cuisine: 'Cuisine',
+  ingredient: 'Ingredient',
+  course: 'Course',
+}
+const TAG_CATEGORY_ORDER = Object.keys(TAG_CATEGORY_LABELS) as TagCategory[]
 
 function IngredientRow({ ingredient }: { ingredient: Ingredient }) {
   const [showRaw, setShowRaw] = useState(false)
@@ -72,6 +86,51 @@ export function RecipeDetailModal({ recipeId, onClose }: RecipeDetailModalProps)
   const [ingredientsDraft, setIngredientsDraft] = useState('')
   const [stepsDraft, setStepsDraft] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const { tags } = useRecipeTags()
+  const { overrides } = useRecipeTagOverrides()
+  const [customTagDrafts, setCustomTagDrafts] = useState<Record<TagCategory, string>>({
+    time: '',
+    cuisine: '',
+    ingredient: '',
+    course: '',
+  })
+
+  const knownTagsByCategory = useMemo(() => groupByCategory(tags ?? []), [tags])
+  const effectiveTags = useMemo(
+    () => (recipeId && tags && overrides ? effectiveTagsByRecipe(tags, overrides).get(recipeId) ?? [] : []),
+    [recipeId, tags, overrides],
+  )
+  const effectiveTagKeys = useMemo(
+    () => new Set(effectiveTags.map((t) => `${t.category}::${t.tagSlug}`)),
+    [effectiveTags],
+  )
+
+  function toggleTag(category: TagCategory, tagSlug: string, label: string) {
+    if (!recipe) return
+    const key = `${category}::${tagSlug}`
+    const isAutoTag =
+      tags?.some((t) => t.recipeId === recipe.id && t.category === category && t.tagSlug === tagSlug) ?? false
+    if (effectiveTagKeys.has(key)) {
+      if (isAutoTag) recipeTagOverrideStore.removeTag(recipe.id, category, tagSlug, label)
+      else recipeTagOverrideStore.clearOverride(recipe.id, category, tagSlug)
+      return
+    }
+    const hadRemoveOverride =
+      overrides?.some(
+        (o) => o.recipeId === recipe.id && o.category === category && o.tagSlug === tagSlug && o.action === 'remove',
+      ) ?? false
+    if (hadRemoveOverride) recipeTagOverrideStore.clearOverride(recipe.id, category, tagSlug)
+    else recipeTagOverrideStore.addTag(recipe.id, category, tagSlug, label)
+  }
+
+  function addCustomTag(category: TagCategory) {
+    if (!recipe) return
+    const label = customTagDrafts[category].trim()
+    if (!label) return
+    recipeTagOverrideStore.addTag(recipe.id, category, slugify(label), label)
+    setCustomTagDrafts((current) => ({ ...current, [category]: '' }))
+  }
 
   useEffect(() => {
     setOverride(null)
@@ -143,7 +202,7 @@ export function RecipeDetailModal({ recipeId, onClose }: RecipeDetailModalProps)
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'tween', duration: 0.25 }}
-          className="fixed inset-0 z-50 overflow-y-auto bg-neutral-950 pb-8"
+          className="fixed inset-0 z-50 overflow-y-auto bg-neutral-950 pb-[calc(2rem+env(safe-area-inset-bottom))]"
         >
           {!recipe ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-white/70">
@@ -166,7 +225,7 @@ export function RecipeDetailModal({ recipeId, onClose }: RecipeDetailModalProps)
                   type="button"
                   onClick={onClose}
                   aria-label="Close"
-                  className="absolute left-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-lg text-white backdrop-blur"
+                  className="absolute left-4 top-[calc(1rem+env(safe-area-inset-top))] flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-lg text-white backdrop-blur"
                 >
                   ✕
                 </button>
@@ -175,7 +234,7 @@ export function RecipeDetailModal({ recipeId, onClose }: RecipeDetailModalProps)
                     type="button"
                     onClick={startEditing}
                     aria-label="Edit recipe"
-                    className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-base text-white backdrop-blur"
+                    className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-base text-white backdrop-blur"
                   >
                     ✎
                   </button>
@@ -237,6 +296,74 @@ export function RecipeDetailModal({ recipeId, onClose }: RecipeDetailModalProps)
                     </div>
                   )
                 )}
+
+                <div>
+                  <h2 className="mb-2 text-lg font-semibold text-white">Tags</h2>
+                  {isEditing ? (
+                    <div className="space-y-4">
+                      {TAG_CATEGORY_ORDER.map((category) => (
+                        <div key={category}>
+                          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-white/40">
+                            {TAG_CATEGORY_LABELS[category]}
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {knownTagsByCategory[category].map((tag) => {
+                              const checked = effectiveTagKeys.has(`${category}::${tag.slug}`)
+                              return (
+                                <button
+                                  key={tag.slug}
+                                  type="button"
+                                  onClick={() => toggleTag(category, tag.slug, tag.label)}
+                                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                                    checked
+                                      ? 'bg-emerald-500 text-neutral-950'
+                                      : 'bg-neutral-900 text-white/60'
+                                  }`}
+                                >
+                                  {tag.label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                          <div className="mt-2 flex gap-2">
+                            <input
+                              type="text"
+                              value={customTagDrafts[category]}
+                              onChange={(e) =>
+                                setCustomTagDrafts((current) => ({ ...current, [category]: e.target.value }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') addCustomTag(category)
+                              }}
+                              placeholder={`Add ${TAG_CATEGORY_LABELS[category].toLowerCase()} tag…`}
+                              className="min-w-0 flex-1 rounded-xl bg-neutral-900 px-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => addCustomTag(category)}
+                              className="shrink-0 rounded-xl bg-neutral-800 px-3 py-1.5 text-xs font-medium text-white/70"
+                            >
+                              Add
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : effectiveTags.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {effectiveTags.map((tag) => (
+                        <span
+                          key={`${tag.category}::${tag.tagSlug}`}
+                          className="rounded-full bg-neutral-800 px-3 py-1 text-xs text-white/70"
+                        >
+                          {tag.label}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-white/40">No tags yet.</p>
+                  )}
+                </div>
 
                 <div>
                   <h2 className="mb-2 text-lg font-semibold text-white">Ingredients</h2>
