@@ -240,6 +240,14 @@ def parse_doc(book_title, doc, bl, roles):
     """Split one content doc into recipe records."""
     ing_cls, step_cls = roles['ingredient'], roles['step']
     recipes, cur, pending_yield = [], None, False
+    # Some books lay out one recipe per file with the title as a styled <p>
+    # (e.g. class "recphd") instead of a real h1/h2/h3 -- every title line in
+    # that layout would otherwise be invisible to the loop below, and with no
+    # recipe ever started, nothing under it gets captured either. Scoped to
+    # whole documents with zero real headings so books that do use h1/h2/h3
+    # for titles (chapter-per-file layouts included, which still have h1s on
+    # their non-recipe chapter-intro docs) are completely unaffected.
+    has_heading = any(tag in ('h1', 'h2', 'h3') for tag, _, _ in bl)
 
     def rescue_yield(r):
         gs = r['ingredient_groups']
@@ -261,8 +269,8 @@ def parse_doc(book_title, doc, bl, roles):
             recipes.append(cur)
         cur = None
 
-    for tag, key, txt in bl:
-        is_head = tag in ('h1', 'h2', 'h3')
+    for i, (tag, key, txt) in enumerate(bl):
+        is_head = tag in ('h1', 'h2', 'h3') or (not has_heading and i == 0)
 
         if is_head and len(txt) < 160:
             # A heading only means a new dish when the current recipe is either

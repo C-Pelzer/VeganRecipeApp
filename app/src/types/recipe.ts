@@ -96,7 +96,7 @@ export interface Deck {
 }
 
 /** Pipeline-computed grouping (scripts/tag-recipes.mjs) — see scripts/schema-recipe-tags.sql. */
-export type TagCategory = 'time' | 'cuisine' | 'ingredient' | 'course'
+export type TagCategory = 'time' | 'cuisine' | 'ingredient' | 'course' | 'book'
 
 export interface RecipeTag {
   recipeId: string

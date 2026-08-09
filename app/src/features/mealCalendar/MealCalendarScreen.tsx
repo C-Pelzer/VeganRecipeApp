@@ -2,14 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRecipes } from '../../lib/data'
 import { store } from '../../lib/store/supabaseStore'
 import { mealCalendarStore } from '../../lib/store/mealCalendarStore'
+import { mealPlanStore } from '../../lib/store/mealPlanStore'
 import { favoritedRecipeIds, unionFavoriteIds } from '../../lib/favorites'
 import { HOUSEHOLD_MEMBERS, type HouseholdMember } from '../../lib/profile'
 import { addDays, formatWeekRangeLabel, isSameDay, startOfWeek, toDateKey, weekDates } from '../../lib/weekDates'
+import { MealDaySheet } from './MealDaySheet'
 import { MealSlotPicker } from './MealSlotPicker'
+import { MEMBER_COLOR, UNASSIGNED_COLOR } from './memberColor'
 import type { MealCalendarEntry, MealType, Recipe, RecipePriority } from '../../types/recipe'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner']
-const MEAL_TYPE_ICONS: Record<MealType, string> = { breakfast: '🌅', lunch: '🥗', dinner: '🌙' }
 
 interface MealCalendarScreenProps {
   onOpenMenu: () => void
@@ -31,6 +33,8 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
     RecipePriority[]
   > | null>(null)
   const [activeSlot, setActiveSlot] = useState<SlotSelection | null>(null)
+  const [openDay, setOpenDay] = useState<Date | null>(null)
+  const [plannedIds, setPlannedIds] = useState<Set<string> | null>(null)
 
   const days = useMemo(() => weekDates(weekStart), [weekStart])
 
@@ -41,6 +45,12 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
         byUser[user] = results[i]
       })
       setPrioritiesByUser(byUser)
+    })
+  }, [])
+
+  useEffect(() => {
+    mealPlanStore.getEntries().then((planEntries) => {
+      setPlannedIds(new Set(planEntries.map((e) => e.recipeId)))
     })
   }, [])
 
@@ -66,6 +76,19 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
     return recipes.filter((r) => favoriteIds.has(r.id))
   }, [recipes, prioritiesByUser])
 
+  // The slot picker shows these as two sections, Meal Plan first — planned
+  // recipes come from the full recipe pool (not just favorites) since
+  // nothing actually requires a planned recipe to also be favorited.
+  const plannedRecipes = useMemo<Recipe[]>(() => {
+    if (!recipes || !plannedIds) return []
+    return recipes.filter((r) => plannedIds.has(r.id))
+  }, [recipes, plannedIds])
+
+  const otherFavoriteRecipes = useMemo<Recipe[]>(() => {
+    if (!plannedIds) return favoriteRecipes
+    return favoriteRecipes.filter((r) => !plannedIds.has(r.id))
+  }, [favoriteRecipes, plannedIds])
+
   const entryByKey = useMemo(() => {
     const map = new Map<string, MealCalendarEntry>()
     for (const entry of entries ?? []) {
@@ -80,8 +103,10 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
     return map
   }, [recipes])
 
-  function handleSlotClick(date: Date, mealType: MealType) {
-    setActiveSlot({ date, mealType })
+  function handleSelectMeal(mealType: MealType) {
+    if (!openDay) return
+    setActiveSlot({ date: openDay, mealType })
+    setOpenDay(null)
   }
 
   function handleSave(recipeId: string, assignedTo: HouseholdMember) {
@@ -116,7 +141,7 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
     )
   }
 
-  if (!recipes || !entries || !prioritiesByUser) {
+  if (!recipes || !entries || !prioritiesByUser || !plannedIds) {
     return (
       <div className="flex h-full items-center justify-center text-white/50">
         Loading meal calendar…
@@ -127,6 +152,15 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
   const activeEntry = activeSlot
     ? entryByKey.get(`${toDateKey(activeSlot.date)}|${activeSlot.mealType}`) ?? null
     : null
+
+  function entriesForDay(day: Date): Partial<Record<MealType, MealCalendarEntry>> {
+    const result: Partial<Record<MealType, MealCalendarEntry>> = {}
+    for (const mealType of MEAL_TYPES) {
+      const entry = entryByKey.get(`${toDateKey(day)}|${mealType}`)
+      if (entry) result[mealType] = entry
+    }
+    return result
+  }
 
   return (
     <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
@@ -169,9 +203,8 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex flex-1 flex-col gap-1 overflow-hidden">
         <div className="flex gap-1">
-          <div className="w-8 shrink-0" />
           {days.map((day) => (
             <div
               key={toDateKey(day)}
@@ -185,46 +218,56 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
           ))}
         </div>
 
-        {MEAL_TYPES.map((mealType) => (
-          <div key={mealType} className="mt-1 flex gap-1">
-            <div className="flex w-8 shrink-0 items-center justify-center text-base">
-              {MEAL_TYPE_ICONS[mealType]}
-            </div>
-            {days.map((day) => {
-              const entry = entryByKey.get(`${toDateKey(day)}|${mealType}`)
-              const recipe = entry ? recipeById.get(entry.recipeId) : undefined
-              return (
-                <button
-                  key={toDateKey(day)}
-                  type="button"
-                  onClick={() => handleSlotClick(day, mealType)}
-                  className={`min-h-16 flex-1 rounded-lg p-1 text-left ${
-                    entry ? 'bg-neutral-800' : 'border border-dashed border-white/10 bg-neutral-900'
-                  }`}
-                >
-                  {entry && recipe ? (
-                    <>
-                      <span className="line-clamp-2 text-[10px] leading-tight text-white">{recipe.title}</span>
-                      <span className="mt-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-semibold text-neutral-950">
-                        {entry.assignedTo[0]}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="flex h-full items-center justify-center text-white/20">+</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
+        {/* One color band per meal, top-to-bottom = breakfast/lunch/dinner,
+            so which third you're looking at is always the same regardless
+            of the day — tap a day to see recipes and edit. */}
+        <div className="flex flex-1 gap-1">
+          {days.map((day) => (
+            <button
+              key={toDateKey(day)}
+              type="button"
+              onClick={() => setOpenDay(day)}
+              className="flex flex-1 flex-col gap-0.5 overflow-hidden rounded-lg"
+            >
+              {MEAL_TYPES.map((mealType) => {
+                const entry = entryByKey.get(`${toDateKey(day)}|${mealType}`)
+                const color = entry ? MEMBER_COLOR[entry.assignedTo] : UNASSIGNED_COLOR
+                return <span key={mealType} aria-hidden="true" className={`flex-1 ${color}`} />
+              })}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-center gap-4 text-xs text-white/50">
+        <span className="flex items-center gap-1.5">
+          <span className={`h-2.5 w-2.5 rounded-full ${UNASSIGNED_COLOR}`} /> Unassigned
+        </span>
+        {HOUSEHOLD_MEMBERS.map((member) => (
+          <span key={member} className="flex items-center gap-1.5">
+            <span className={`h-2.5 w-2.5 rounded-full ${MEMBER_COLOR[member]}`} /> {member}
+          </span>
         ))}
       </div>
+
+      {openDay && (
+        <MealDaySheet
+          isOpen={true}
+          date={openDay}
+          entries={entriesForDay(openDay)}
+          recipeById={recipeById}
+          onSelectMeal={handleSelectMeal}
+          onClose={() => setOpenDay(null)}
+        />
+      )}
 
       {activeSlot && (
         <MealSlotPicker
           isOpen={true}
           date={activeSlot.date}
           mealType={activeSlot.mealType}
-          recipes={favoriteRecipes}
+          plannedRecipes={plannedRecipes}
+          favoriteRecipes={otherFavoriteRecipes}
           initialEntry={activeEntry}
           onSave={handleSave}
           onClear={handleClear}

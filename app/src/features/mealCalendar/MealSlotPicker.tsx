@@ -13,7 +13,10 @@ interface MealSlotPickerProps {
   isOpen: boolean
   date: Date
   mealType: MealType
-  recipes: Recipe[]
+  /** Shown first, its own section — recipes already on the meal plan. */
+  plannedRecipes: Recipe[]
+  /** Shown after Meal Plan — every other favorite (caller excludes anything already in plannedRecipes). */
+  favoriteRecipes: Recipe[]
   initialEntry: MealCalendarEntry | null
   onSave: (recipeId: string, assignedTo: HouseholdMember) => void
   onClear: () => void
@@ -25,7 +28,8 @@ export function MealSlotPicker({
   isOpen,
   date,
   mealType,
-  recipes,
+  plannedRecipes,
+  favoriteRecipes,
   initialEntry,
   onSave,
   onClear,
@@ -44,9 +48,36 @@ export function MealSlotPicker({
     }
   }, [isOpen, initialEntry])
 
-  const visibleRecipes = search.trim()
-    ? recipes.filter((r) => r.title.toLowerCase().includes(search.trim().toLowerCase()))
-    : recipes
+  function matchesSearch(recipe: Recipe): boolean {
+    const query = search.trim().toLowerCase()
+    return !query || recipe.title.toLowerCase().includes(query)
+  }
+
+  const visiblePlanned = plannedRecipes.filter(matchesSearch)
+  const visibleFavorites = favoriteRecipes.filter(matchesSearch)
+  const hasAnyRecipes = plannedRecipes.length > 0 || favoriteRecipes.length > 0
+
+  function renderRecipeButton(recipe: Recipe) {
+    return (
+      <button
+        key={recipe.id}
+        type="button"
+        onClick={() => setSelectedRecipeId(recipe.id)}
+        className={`flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-colors ${
+          selectedRecipeId === recipe.id ? 'bg-emerald-500/20 ring-1 ring-emerald-500' : 'bg-neutral-800'
+        }`}
+      >
+        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-neutral-700">
+          {recipe.image ? (
+            <img src={recipe.image} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xl">🌱</div>
+          )}
+        </div>
+        <p className="min-w-0 flex-1 truncate font-medium">{recipe.title}</p>
+      </button>
+    )
+  }
 
   return (
     <AnimatePresence>
@@ -119,30 +150,25 @@ export function MealSlotPicker({
             </div>
 
             <div className="flex-1 space-y-2 overflow-y-auto px-4 pb-4">
-              {visibleRecipes.length === 0 ? (
+              {visiblePlanned.length === 0 && visibleFavorites.length === 0 ? (
                 <p className="py-6 text-center text-sm text-white/50">
-                  {recipes.length === 0 ? 'No favorites yet — swipe right on something first.' : 'No matches.'}
+                  {hasAnyRecipes ? 'No matches.' : 'No favorites yet — swipe right on something first.'}
                 </p>
               ) : (
-                visibleRecipes.map((recipe) => (
-                  <button
-                    key={recipe.id}
-                    type="button"
-                    onClick={() => setSelectedRecipeId(recipe.id)}
-                    className={`flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-colors ${
-                      selectedRecipeId === recipe.id ? 'bg-emerald-500/20 ring-1 ring-emerald-500' : 'bg-neutral-800'
-                    }`}
-                  >
-                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-neutral-700">
-                      {recipe.image ? (
-                        <img src={recipe.image} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-xl">🌱</div>
-                      )}
-                    </div>
-                    <p className="min-w-0 flex-1 truncate font-medium">{recipe.title}</p>
-                  </button>
-                ))
+                <>
+                  {visiblePlanned.length > 0 && (
+                    <>
+                      <p className="px-1 text-xs font-medium uppercase tracking-wide text-white/40">Meal Plan</p>
+                      {visiblePlanned.map(renderRecipeButton)}
+                    </>
+                  )}
+                  {visibleFavorites.length > 0 && (
+                    <>
+                      <p className="px-1 text-xs font-medium uppercase tracking-wide text-white/40">Favorites</p>
+                      {visibleFavorites.map(renderRecipeButton)}
+                    </>
+                  )}
+                </>
               )}
             </div>
 

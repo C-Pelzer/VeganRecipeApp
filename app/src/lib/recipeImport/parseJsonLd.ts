@@ -16,6 +16,19 @@ export interface RawRecipeJsonLd {
   [key: string]: unknown
 }
 
+// Sites that entity-encode their JSON-LD text (common on WordPress recipe
+// plugins) leave literal &#8217;/&amp;/etc. behind: a <script> tag's content
+// is never HTML-entity-decoded by the browser's HTML parser (script data is
+// raw text, not parsed as markup), and JSON.parse doesn't know about HTML
+// entities either — so without this, that text passes straight through.
+// Round-tripping through a detached <textarea> reuses the browser's own
+// entity table instead of hand-maintaining one.
+export function decodeHtmlEntities(text: string): string {
+  const el = document.createElement('textarea')
+  el.innerHTML = text
+  return el.value
+}
+
 function isRecipeType(node: unknown): boolean {
   if (!node || typeof node !== 'object') return false
   const type = (node as Record<string, unknown>)['@type']
@@ -66,11 +79,11 @@ export function normalizeImageUrl(image: unknown): string | null {
 
 export function normalizeAuthors(author: unknown): string[] {
   if (!author) return []
-  if (typeof author === 'string') return [author]
+  if (typeof author === 'string') return [decodeHtmlEntities(author)]
   if (Array.isArray(author)) return author.flatMap(normalizeAuthors)
   if (typeof author === 'object' && 'name' in (author as Record<string, unknown>)) {
     const name = (author as Record<string, unknown>).name
-    return typeof name === 'string' ? [name] : []
+    return typeof name === 'string' ? [decodeHtmlEntities(name)] : []
   }
   return []
 }
@@ -78,7 +91,7 @@ export function normalizeAuthors(author: unknown): string[] {
 export function normalizeServings(recipeYield: unknown): { servings: number | null; servingsText: string | null } {
   const text = Array.isArray(recipeYield) ? recipeYield[0] : recipeYield
   if (typeof text !== 'string' && typeof text !== 'number') return { servings: null, servingsText: null }
-  const str = String(text)
+  const str = decodeHtmlEntities(String(text))
   const match = str.match(/\d+/)
   return { servings: match ? Number(match[0]) : null, servingsText: str }
 }
@@ -113,6 +126,6 @@ function flattenInstructions(node: unknown): string[] {
 
 export function normalizeInstructions(recipeInstructions: unknown): string[] {
   return flattenInstructions(recipeInstructions)
-    .map((step) => step.trim())
+    .map((step) => decodeHtmlEntities(step).trim())
     .filter(Boolean)
 }

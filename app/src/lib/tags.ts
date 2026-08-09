@@ -1,18 +1,28 @@
 import { useEffect, useState } from 'react'
+import { fetchAllRows } from './fetchAllRows'
 import { supabase } from './supabaseClient'
 import type { RecipeTag, RecipeTagOverride, TagCategory } from '../types/recipe'
+
+interface RecipeTagRow {
+  recipe_id: string
+  category: TagCategory
+  tag_slug: string
+  label: string
+}
 
 let cache: Promise<RecipeTag[]> | null = null
 
 /**
  * Fetches the full recipe_tags table (see scripts/tag-recipes.mjs). Cached in
  * memory for the life of the tab, same pattern as loadRecipes in data.ts —
- * small enough (a few thousand rows) to just load wholesale.
+ * paginated since one book tag per recipe alone puts this table well past
+ * Supabase's default 1000-row-per-request cap.
  */
 async function fetchTags(): Promise<RecipeTag[]> {
-  const { data, error } = await supabase.from('recipe_tags').select('*')
-  if (error) throw error
-  return (data ?? []).map((row) => ({
+  const data = await fetchAllRows<RecipeTagRow>((from, to) =>
+    supabase.from('recipe_tags').select('*').range(from, to),
+  )
+  return data.map((row) => ({
     recipeId: row.recipe_id,
     category: row.category,
     tagSlug: row.tag_slug,
@@ -60,10 +70,20 @@ let overrideCache: Promise<RecipeTagOverride[]> | null = null
  * invalidateTagOverrides() since, unlike the pipeline tables, this one
  * changes during a session.
  */
+interface RecipeTagOverrideRow {
+  recipe_id: string
+  category: TagCategory
+  tag_slug: string
+  label: string
+  action: 'add' | 'remove'
+  updated_at: string
+}
+
 async function fetchOverrides(): Promise<RecipeTagOverride[]> {
-  const { data, error } = await supabase.from('recipe_tag_overrides').select('*')
-  if (error) throw error
-  return (data ?? []).map((row) => ({
+  const data = await fetchAllRows<RecipeTagOverrideRow>((from, to) =>
+    supabase.from('recipe_tag_overrides').select('*').range(from, to),
+  )
+  return data.map((row) => ({
     recipeId: row.recipe_id,
     category: row.category,
     tagSlug: row.tag_slug,

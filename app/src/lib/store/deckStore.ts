@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient'
+import { fetchAllRows } from '../fetchAllRows'
 import { generateId } from '../generateId'
 import type { HouseholdMember } from '../profile'
 import type { SwipeDeckShare, SwipeDeckSummary, TagCategory } from '../../types/recipe'
@@ -94,10 +95,10 @@ export interface HomeDecks {
 /**
  * Everything DecksHomeScreen needs in one shot: every deck plus its full
  * recipe-id membership, so the screen can derive both an accurate count and
- * a 3-photo preview. Every deck here is capped at 40 recipes already, so
- * loading full membership for every deck on the home screen (a few dozen
- * decks at most) is still comfortably within this codebase's existing
- * "small enough, just load wholesale" pattern (recipe_tags, imported_recipes).
+ * a 3-photo preview. Every deck here is capped at 40 recipes, but with a
+ * deck per cookbook there are now 100+ decks — comfortably enough rows to
+ * exceed Supabase's default 1000-row-per-request cap, so this pages through
+ * with fetchAllRows rather than a bare .select().
  */
 async function listHomeDecks(currentUser: HouseholdMember): Promise<HomeDecks> {
   const [myDecks, categoryDecks] = await Promise.all([listMyDecks(currentUser), listCategoryDecks()])
@@ -105,13 +106,15 @@ async function listHomeDecks(currentUser: HouseholdMember): Promise<HomeDecks> {
   const deckIds = [...myDecks.map((d) => d.deck.id), ...categoryDecks.map((d) => d.id)]
   const recipeIdsByDeck = new Map<string, string[]>()
   if (deckIds.length > 0) {
-    const { data, error } = await supabase
-      .from('swipe_deck_recipes')
-      .select('deck_id, recipe_id')
-      .in('deck_id', deckIds)
-      .order('position', { ascending: true })
-    if (error) throw error
-    for (const row of data ?? []) {
+    const data = await fetchAllRows<{ deck_id: string; recipe_id: string }>((from, to) =>
+      supabase
+        .from('swipe_deck_recipes')
+        .select('deck_id, recipe_id')
+        .in('deck_id', deckIds)
+        .order('position', { ascending: true })
+        .range(from, to),
+    )
+    for (const row of data) {
       const ids = recipeIdsByDeck.get(row.deck_id) ?? []
       ids.push(row.recipe_id)
       recipeIdsByDeck.set(row.deck_id, ids)

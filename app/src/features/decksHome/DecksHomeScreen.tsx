@@ -17,6 +17,7 @@ const CATEGORY_LABELS: Record<TagCategory, string> = {
   course: 'Course',
   ingredient: 'Ingredient',
   time: 'Time',
+  book: 'Book',
 }
 const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS) as TagCategory[]
 

@@ -1,5 +1,6 @@
 import { parseIngredientLine } from './parseIngredientLine'
 import {
+  decodeHtmlEntities,
   findRecipeJsonLd,
   formatIsoDuration,
   normalizeAuthors,
@@ -36,7 +37,9 @@ export function importRecipeFromHtml(html: string, sourceUrl: string): ImportRes
   const image = rawImage ? resolveUrl(rawImage, sourceUrl) : null
   const timeText = formatIsoDuration(jsonLd.totalTime)
   const steps = normalizeInstructions(jsonLd.recipeInstructions)
-  const ingredients = (jsonLd.recipeIngredient ?? []).map(parseIngredientLine)
+  const ingredients = (jsonLd.recipeIngredient ?? []).map((line) =>
+    parseIngredientLine(decodeHtmlEntities(line)),
+  )
 
   if (!image) warnings.push('No image found on the page.')
   if (!timeText) warnings.push('No total time found.')
@@ -52,7 +55,7 @@ export function importRecipeFromHtml(html: string, sourceUrl: string): ImportRes
 
   const recipe: Recipe = {
     id: `imported-${generateId()}`,
-    title: jsonLd.name,
+    title: decodeHtmlEntities(jsonLd.name),
     source_book: hostname,
     source_file: sourceUrl,
     authors: normalizeAuthors(jsonLd.author),
@@ -60,7 +63,7 @@ export function importRecipeFromHtml(html: string, sourceUrl: string): ImportRes
     servings_text: servingsText,
     time_text: timeText,
     diet_tags: [],
-    headnote: typeof jsonLd.description === 'string' ? jsonLd.description : null,
+    headnote: typeof jsonLd.description === 'string' ? decodeHtmlEntities(jsonLd.description) : null,
     ingredient_groups: [{ name: null, ingredients }],
     steps,
     notes: [],

@@ -53,10 +53,24 @@ function isDeckEligible(recipe) {
   return !recipe.isComponent && recipe.hasSteps;
 }
 
+// PostgREST caps a single .select() at db-max-rows (1000 by default on
+// Supabase) with no error — just a silently truncated result. recipe_tags
+// alone is now ~5-6x that (one book tag per recipe on top of everything
+// else), so a bare .select() here was quietly only ever seeing the first
+// ~1000 rows — recipes are stored book-by-book, so in practice that meant
+// only the first couple of books' tags existed at all from this script's
+// point of view. Page through with .range() instead.
+const PAGE_SIZE = 1000;
+
 async function fetchAll(table, columns) {
-  const { data, error } = await supabase.from(table).select(columns);
-  if (error) throw new Error(`Failed to fetch ${table}: ${error.message}`);
-  return data ?? [];
+  const rows = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase.from(table).select(columns).range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(`Failed to fetch ${table}: ${error.message}`);
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+  return rows;
 }
 
 // Auto tags plus overrides layered on top, same semantics as

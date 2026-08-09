@@ -30,11 +30,14 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- Time buckets -----------------------------------------------------
 
+// Bare bucket names, not "time-15" etc. — build-swipe-decks.mjs already
+// prepends the category ("time-") when it builds a deck id, so baking it in
+// here too produced doubled ids like "time-time-15".
 const TIME_BUCKETS = [
-  { slug: "time-15", label: "15 min or less", max: 15 },
-  { slug: "time-30", label: "16–30 min", max: 30 },
-  { slug: "time-60", label: "31–60 min", max: 60 },
-  { slug: "time-60-plus", label: "Over 60 min", max: Infinity },
+  { slug: "15", label: "15 min or less", max: 15 },
+  { slug: "30", label: "16–30 min", max: 30 },
+  { slug: "60", label: "31–60 min", max: 60 },
+  { slug: "60-plus", label: "Over 60 min", max: Infinity },
 ];
 
 // time_text is free text from the book ("10 minutes", "6-8 MIN", "1 hr 30 min").
@@ -91,8 +94,18 @@ const TRACKED_INGREDIENTS = [
   "almond",
 ];
 
+// Collapses any run of non-alphanumeric characters (quotes, parens, colons,
+// commas, apostrophes, ®, !, ?, etc. — recipe/book titles have all of these)
+// into a single hyphen, then trims stray leading/trailing hyphens. A plain
+// whitespace-only replace left punctuation embedded raw in the slug, which
+// broke deck ids used directly in URLs (e.g. a "?" turns the rest of the id
+// into a query string).
 function slugify(text) {
-  return text.toLowerCase().replace(/\s+/g, "-");
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 function capitalize(text) {
@@ -173,6 +186,16 @@ function courseTags(recipe) {
   return tags;
 }
 
+// --- Book tags --------------------------------------------------------
+// One per recipe, straight from source_book — no keyword-matching needed,
+// this is exact metadata, not a guess. Exists so build-swipe-decks.mjs
+// builds a deck per cookbook the same way it does for every other category.
+
+function bookTag(recipe) {
+  if (!recipe.source_book) return null;
+  return { slug: slugify(recipe.source_book), label: recipe.source_book };
+}
+
 // --- Main -----------------------------------------------------------------
 
 function buildRows(recipes) {
@@ -192,6 +215,9 @@ function buildRows(recipes) {
     for (const tag of courseTags(recipe)) {
       rows.push({ recipe_id: recipe.id, category: "course", tag_slug: tag.slug, label: tag.label });
     }
+
+    const book = bookTag(recipe);
+    if (book) rows.push({ recipe_id: recipe.id, category: "book", tag_slug: book.slug, label: book.label });
   }
   return rows;
 }

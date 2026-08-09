@@ -18,11 +18,22 @@ function originalIngredientsText(recipe: Recipe): string {
   return recipe.ingredient_groups.flatMap((g) => g.ingredients.map((i) => i.display)).join('\n')
 }
 
+// Collapses punctuation (quotes, parens, etc.) into hyphens instead of
+// keeping it raw — mirrors scripts/tag-recipes.mjs's slugify, which had the
+// same gap and produced deck ids that broke when used in a URL.
 function slugify(text: string): string {
-  return text.trim().toLowerCase().replace(/\s+/g, '-')
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
-const TAG_CATEGORY_LABELS: Record<TagCategory, string> = {
+// 'book' is deliberately excluded here — a recipe's book isn't a manual
+// correction the way cuisine/course can be, and it's already shown
+// elsewhere on this screen. It still exists as a TagCategory so
+// scripts/build-swipe-decks.mjs can build one deck per cookbook.
+const TAG_CATEGORY_LABELS: Partial<Record<TagCategory, string>> = {
   time: 'Time',
   cuisine: 'Cuisine',
   ingredient: 'Ingredient',
@@ -89,7 +100,7 @@ export function RecipeDetailModal({ recipeId, onClose }: RecipeDetailModalProps)
 
   const { tags } = useRecipeTags()
   const { overrides } = useRecipeTagOverrides()
-  const [customTagDrafts, setCustomTagDrafts] = useState<Record<TagCategory, string>>({
+  const [customTagDrafts, setCustomTagDrafts] = useState<Partial<Record<TagCategory, string>>>({
     time: '',
     cuisine: '',
     ingredient: '',
@@ -126,7 +137,7 @@ export function RecipeDetailModal({ recipeId, onClose }: RecipeDetailModalProps)
 
   function addCustomTag(category: TagCategory) {
     if (!recipe) return
-    const label = customTagDrafts[category].trim()
+    const label = (customTagDrafts[category] ?? '').trim()
     if (!label) return
     recipeTagOverrideStore.addTag(recipe.id, category, slugify(label), label)
     setCustomTagDrafts((current) => ({ ...current, [category]: '' }))
@@ -328,14 +339,14 @@ export function RecipeDetailModal({ recipeId, onClose }: RecipeDetailModalProps)
                           <div className="mt-2 flex gap-2">
                             <input
                               type="text"
-                              value={customTagDrafts[category]}
+                              value={customTagDrafts[category] ?? ''}
                               onChange={(e) =>
                                 setCustomTagDrafts((current) => ({ ...current, [category]: e.target.value }))
                               }
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') addCustomTag(category)
                               }}
-                              placeholder={`Add ${TAG_CATEGORY_LABELS[category].toLowerCase()} tag…`}
+                              placeholder={`Add ${(TAG_CATEGORY_LABELS[category] ?? '').toLowerCase()} tag…`}
                               className="min-w-0 flex-1 rounded-xl bg-neutral-900 px-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:outline-none"
                             />
                             <button

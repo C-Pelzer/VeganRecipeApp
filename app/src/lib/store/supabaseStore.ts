@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient'
+import { fetchAllRows } from '../fetchAllRows'
 import { LocalStore } from './localStore'
 import type { SyncStore } from './types'
 import type { RecipePriority, SwipeDirection } from '../../types/recipe'
@@ -86,12 +87,13 @@ export class SupabaseStore implements SyncStore {
   async getPriorities(userId: string): Promise<RecipePriority[]> {
     await this.flushPending()
     try {
-      const { data, error } = await supabase
-        .from('recipe_priority')
-        .select('*')
-        .eq('user_id', userId)
-      if (error) throw error
-      const priorities = (data as PriorityRow[]).map(rowToPriority)
+      // Paginated: with 4800+ recipes in the pool, a household member who's
+      // swiped through more than 1000 of them would otherwise silently lose
+      // the rest to Supabase's default per-request row cap.
+      const data = await fetchAllRows<PriorityRow>((from, to) =>
+        supabase.from('recipe_priority').select('*').eq('user_id', userId).range(from, to),
+      )
+      const priorities = data.map(rowToPriority)
       for (const p of priorities) {
         await this.cache.setPriority(p)
       }
