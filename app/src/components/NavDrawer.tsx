@@ -87,6 +87,9 @@ export function NavDrawer({ isOpen, onClose, currentUser, onSwitchUser }: NavDra
                 <NavLink to="/import" onClick={onClose} className={navLinkClass}>
                   🔗 Import Recipe
                 </NavLink>
+                <NavLink to="/add-recipe" onClick={onClose} className={navLinkClass}>
+                  ✍️ Add Recipe
+                </NavLink>
                 <NavLink to="/catalog" onClick={onClose} className={navLinkClass}>
                   🔍 Catalog
                 </NavLink>

@@ -172,6 +172,18 @@ export interface RecipeOverride {
   updatedAt: string
 }
 
+/**
+ * A user-added "I made this" photo, layered alongside (not replacing) the
+ * recipe's original book/import photo (scripts/schema-recipe-photos.sql).
+ */
+export interface RecipePhoto {
+  id: string
+  recipeId: string
+  photoUrl: string
+  addedBy: HouseholdMember
+  addedAt: string
+}
+
 export type MealType = 'breakfast' | 'lunch' | 'dinner'
 
 /** One filled calendar slot — a recipe + assigned person on a given date (scripts/schema-meal-calendar.sql). */

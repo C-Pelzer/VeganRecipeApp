@@ -9,14 +9,29 @@ import { ShoppingListScreen } from './features/shoppingList/ShoppingListScreen'
 import { MealPlanScreen } from './features/mealPlan/MealPlanScreen'
 import { MealCalendarScreen } from './features/mealCalendar/MealCalendarScreen'
 import { ImportRecipeScreen } from './features/importRecipe/ImportRecipeScreen'
+import { AddRecipeScreen } from './features/addRecipe/AddRecipeScreen'
 import { CatalogScreen } from './features/catalog/CatalogScreen'
 import { ProfilePicker } from './features/profile/ProfilePicker'
 import { clearCurrentUser, getCurrentUser, setCurrentUser, type HouseholdMember } from './lib/profile'
 
+// A backgrounded mobile tab (e.g. while the native camera app is in the
+// foreground for a photo upload) can get its process killed for memory and
+// come back as a fresh reload — this survives that by restoring which
+// recipe was open instead of dropping back to the home screen.
+const VIEWING_RECIPE_KEY = 'recipe-app:viewingRecipeId'
+
 function App() {
   const [currentUser, setCurrentUserState] = useState<HouseholdMember | null>(getCurrentUser)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [viewingRecipeId, setViewingRecipeId] = useState<string | null>(null)
+  const [viewingRecipeId, setViewingRecipeIdState] = useState<string | null>(() =>
+    sessionStorage.getItem(VIEWING_RECIPE_KEY),
+  )
+
+  function setViewingRecipeId(recipeId: string | null) {
+    setViewingRecipeIdState(recipeId)
+    if (recipeId) sessionStorage.setItem(VIEWING_RECIPE_KEY, recipeId)
+    else sessionStorage.removeItem(VIEWING_RECIPE_KEY)
+  }
 
   function handleSelect(user: HouseholdMember) {
     setCurrentUser(user)
@@ -39,7 +54,11 @@ function App() {
             currentUser={currentUser}
             onSwitchUser={handleSwitchUser}
           />
-          <RecipeDetailModal recipeId={viewingRecipeId} onClose={() => setViewingRecipeId(null)} />
+          <RecipeDetailModal
+            recipeId={viewingRecipeId}
+            currentUser={currentUser}
+            onClose={() => setViewingRecipeId(null)}
+          />
           <Routes>
             <Route
               path="/"
@@ -85,6 +104,16 @@ function App() {
               path="/import"
               element={
                 <ImportRecipeScreen
+                  currentUser={currentUser}
+                  onOpenMenu={() => setMenuOpen(true)}
+                  onViewRecipe={setViewingRecipeId}
+                />
+              }
+            />
+            <Route
+              path="/add-recipe"
+              element={
+                <AddRecipeScreen
                   currentUser={currentUser}
                   onOpenMenu={() => setMenuOpen(true)}
                   onViewRecipe={setViewingRecipeId}

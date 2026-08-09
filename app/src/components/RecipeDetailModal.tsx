@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useRecipes } from '../lib/data'
+import type { HouseholdMember } from '../lib/profile'
 import { recipeOverrideStore } from '../lib/store/recipeOverrideStore'
+import { recipePhotoStore } from '../lib/store/recipePhotoStore'
 import { recipeTagOverrideStore } from '../lib/store/recipeTagOverrideStore'
 import { effectiveTagsByRecipe, groupByCategory, useRecipeTagOverrides, useRecipeTags } from '../lib/tags'
-import type { Ingredient, IngredientGroup, Recipe, RecipeOverride, TagCategory } from '../types/recipe'
+import type { Ingredient, IngredientGroup, Recipe, RecipeOverride, RecipePhoto, TagCategory } from '../types/recipe'
 
 // One item/step per line, blank lines dropped.
 function splitLines(text: string): string[] {
@@ -79,6 +81,7 @@ function IngredientGroupBlock({ group }: { group: IngredientGroup }) {
 
 interface RecipeDetailModalProps {
   recipeId: string | null
+  currentUser: HouseholdMember
   onClose: () => void
 }
 
@@ -87,7 +90,7 @@ interface RecipeDetailModalProps {
 // progress, tab selection) survives opening and closing this without a route
 // change. Sliding up from the bottom (vs. NavDrawer's side slide or
 // ConfirmDialog's centered fade) reads as "content on top," not navigation.
-export function RecipeDetailModal({ recipeId, onClose }: RecipeDetailModalProps) {
+export function RecipeDetailModal({ recipeId, currentUser, onClose }: RecipeDetailModalProps) {
   const { recipes } = useRecipes()
   const recipe = recipeId ? recipes?.find((r) => r.id === recipeId) : null
 
@@ -97,6 +100,13 @@ export function RecipeDetailModal({ recipeId, onClose }: RecipeDetailModalProps)
   const [ingredientsDraft, setIngredientsDraft] = useState('')
   const [stepsDraft, setStepsDraft] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const [photos, setPhotos] = useState<RecipePhoto[]>([])
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+  const [activeSlide, setActiveSlide] = useState(0)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const carouselRef = useRef<HTMLDivElement>(null)
 
   const { tags } = useRecipeTags()
   const { overrides } = useRecipeTagOverrides()
@@ -155,6 +165,47 @@ export function RecipeDetailModal({ recipeId, onClose }: RecipeDetailModalProps)
       cancelled = true
     }
   }, [recipeId])
+
+  useEffect(() => {
+    setPhotos([])
+    setActiveSlide(0)
+    setPhotoError(null)
+    if (!recipeId) return
+    let cancelled = false
+    recipePhotoStore.listPhotos(recipeId).then((data) => {
+      if (!cancelled) setPhotos(data)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [recipeId])
+
+  function handlePhotoSelected(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !recipe) return
+    setUploadingPhoto(true)
+    setPhotoError(null)
+    recipePhotoStore
+      .addPhoto(recipe.id, file, currentUser)
+      .then((photo) => {
+        setPhotos((current) => [...current, photo])
+        const el = carouselRef.current
+        if (el) el.scrollTo({ left: el.clientWidth * (photos.length + 1), behavior: 'smooth' })
+      })
+      .catch((err) => setPhotoError(err instanceof Error ? err.message : 'Upload failed.'))
+      .finally(() => setUploadingPhoto(false))
+  }
+
+  function handleDeletePhoto(photo: RecipePhoto) {
+    recipePhotoStore
+      .deletePhoto(photo)
+      .then(() => {
+        setPhotos((current) => current.filter((p) => p.id !== photo.id))
+        setActiveSlide((current) => Math.max(0, current - 1))
+      })
+      .catch((err) => setPhotoError(err instanceof Error ? err.message : 'Delete failed.'))
+  }
 
   function startEditing() {
     if (!recipe) return
@@ -225,13 +276,57 @@ export function RecipeDetailModal({ recipeId, onClose }: RecipeDetailModalProps)
           ) : (
             <>
               <div className="relative aspect-[4/3] w-full bg-neutral-800">
-                {recipe.image ? (
-                  <img src={recipe.image} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-800 to-neutral-900 text-6xl">
-                    🌱
+                <div
+                  ref={carouselRef}
+                  className="flex h-full w-full snap-x snap-mandatory overflow-x-auto scroll-smooth"
+                  onScroll={(e) => {
+                    const el = e.currentTarget
+                    setActiveSlide(Math.round(el.scrollLeft / Math.max(el.clientWidth, 1)))
+                  }}
+                >
+                  <div className="h-full w-full shrink-0 snap-center">
+                    {recipe.image ? (
+                      <img src={recipe.image} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-800 to-neutral-900 text-6xl">
+                        🌱
+                      </div>
+                    )}
+                  </div>
+                  {photos.map((photo) => (
+                    <div key={photo.id} className="relative h-full w-full shrink-0 snap-center">
+                      <img src={photo.photoUrl} alt="" className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePhoto(photo)}
+                        aria-label="Delete photo"
+                        className="absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-sm text-white backdrop-blur"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {photos.length > 0 && (
+                  <div className="absolute bottom-3 left-0 flex w-full justify-center gap-1.5">
+                    {Array.from({ length: photos.length + 1 }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          i === activeSlide ? 'bg-white' : 'bg-white/40'
+                        }`}
+                      />
+                    ))}
                   </div>
                 )}
+
+                {uploadingPhoto && (
+                  <div className="absolute left-1/2 top-[calc(1rem+env(safe-area-inset-top))] -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs text-white backdrop-blur">
+                    Uploading…
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={onClose}
@@ -240,17 +335,37 @@ export function RecipeDetailModal({ recipeId, onClose }: RecipeDetailModalProps)
                 >
                   ✕
                 </button>
-                {!isEditing && (
+                <div className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] flex gap-2">
                   <button
                     type="button"
-                    onClick={startEditing}
-                    aria-label="Edit recipe"
-                    className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-base text-white backdrop-blur"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={uploadingPhoto}
+                    aria-label="Add a photo"
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-base text-white backdrop-blur disabled:opacity-50"
                   >
-                    ✎
+                    📷
                   </button>
-                )}
+                  {!isEditing && (
+                    <button
+                      type="button"
+                      onClick={startEditing}
+                      aria-label="Edit recipe"
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-base text-white backdrop-blur"
+                    >
+                      ✎
+                    </button>
+                  )}
+                </div>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handlePhotoSelected}
+                  className="hidden"
+                />
               </div>
+              {photoError && <p className="px-4 pt-2 text-sm text-red-400">{photoError}</p>}
 
               <div className="space-y-5 p-4">
                 <div>

@@ -56,5 +56,8 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true,
     },
+    preview: {
+      host: true,
+    },
   }
 })

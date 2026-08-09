@@ -4,8 +4,8 @@
 // errors because it has no Deno type info, not because anything is wrong.
 //
 // Supabase Edge Function — server-side proxy for the "import recipe from a
-// URL" feature (NewIdeas.txt item #1). Handles two things a browser can't do
-// itself against an arbitrary third-party site:
+// URL" feature (NewIdeas.txt item #1) and post-cook photo uploads (item #3).
+// Handles three things better done off a phone/browser:
 //
 //   1. mode "html" (default): fetch a recipe page's HTML so the app can scan
 //      it for schema.org Recipe JSON-LD. Most sites don't send CORS headers,
@@ -15,6 +15,15 @@
 //      pipeline uses (scripts/upload-images.mjs) — so imported recipes don't
 //      hotlink the source site's image (which can disappear or block
 //      hotlinking) and don't pull down a full-resolution photo on every load.
+//   3. multipart upload (Content-Type: multipart/form-data): resize a
+//      user-provided photo and upload it — either a manually-added recipe's
+//      primary photo (kind "hero", one object per recipe) or a post-cook
+//      "I made this" photo (kind "post-cook", default, one of possibly
+//      several). Server-side rather than a client-side canvas resize because
+//      a raw phone-camera photo decodes to 100MB+ of pixels, which crashes
+//      canvas/ImageBitmap on real Android hardware ("unable to complete
+//      operation because of low memory") — the browser only needs to
+//      read+POST the compressed file bytes, never decode them.
 //
 // Deploy via the Supabase Dashboard: Edge Functions → New Function → name it
 // "fetch-page" → paste this file's contents → Deploy. (Or `supabase functions
@@ -34,6 +43,8 @@ const CORS_HEADERS = {
 const MAX_HTML_BYTES = 5 * 1024 * 1024 // recipe blog pages are never this big
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024 // guard against something absurd before we even try to decode
 const IMAGE_MAX_WIDTH = 480 // "low resolution snapshot" — plenty for a swipe card / detail header
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024 // real camera JPEGs, even high-megapixel ones, land well under this
+const UPLOAD_MAX_WIDTH = 1440 // a post-cook photo is a "hero" photo people look back on, not a thumbnail
 const IMAGE_BUCKET = 'recipe-images'
 const BLOCKED_HOSTNAMES = new Set(['localhost', '0.0.0.0', '127.0.0.1', '::1'])
 
@@ -138,9 +149,62 @@ async function handleImageSnapshot(targetUrl: URL, recipeId: string): Promise<Re
   return jsonResponse({ publicUrl })
 }
 
+async function handlePhotoUpload(req: Request): Promise<Response> {
+  const form = await req.formData()
+  const recipeId = form.get('recipeId')
+  const file = form.get('file')
+  // 'hero' = the recipe's one primary photo, same single-object-per-recipe
+  // convention handleImageSnapshot uses (overwritable). 'post-cook' = one of
+  // possibly several "I made this" photos, each its own object.
+  const kind = form.get('kind') === 'hero' ? 'hero' : 'post-cook'
+  if (typeof recipeId !== 'string' || !recipeId) {
+    return jsonResponse({ error: 'Upload requires a "recipeId" field' }, 400)
+  }
+  if (!(file instanceof File)) {
+    return jsonResponse({ error: 'Upload requires a "file" field' }, 400)
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return jsonResponse({ error: 'Photo too large' }, 413)
+  }
+
+  const bytes = new Uint8Array(await file.arrayBuffer())
+
+  let image: Image
+  try {
+    image = await Image.decode(bytes)
+  } catch {
+    return jsonResponse({ error: 'Unrecognized image format' }, 502)
+  }
+
+  if (image.width > UPLOAD_MAX_WIDTH) {
+    image.resize(UPLOAD_MAX_WIDTH, Image.RESIZE_AUTO)
+  }
+  const jpeg = await image.encodeJPEG(82)
+
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!)
+  const objectPath =
+    kind === 'hero' ? `${recipeId}.jpg` : `post-cook/${recipeId}/${crypto.randomUUID()}.jpg`
+  const { error: uploadError } = await supabase.storage
+    .from(IMAGE_BUCKET)
+    .upload(objectPath, jpeg, { contentType: 'image/jpeg', upsert: kind === 'hero' })
+  if (uploadError) return jsonResponse({ error: `Upload failed: ${uploadError.message}` }, 502)
+
+  const publicUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/${IMAGE_BUCKET}/${objectPath}`
+  return jsonResponse({ publicUrl })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS })
   if (req.method !== 'POST') return jsonResponse({ error: 'Use POST' }, 405)
+
+  const contentType = req.headers.get('content-type') ?? ''
+  if (contentType.includes('multipart/form-data')) {
+    try {
+      return await handlePhotoUpload(req)
+    } catch (err) {
+      return jsonResponse({ error: `Upload failed: ${err instanceof Error ? err.message : String(err)}` }, 502)
+    }
+  }
 
   let body: { url?: unknown; mode?: unknown; recipeId?: unknown }
   try {
