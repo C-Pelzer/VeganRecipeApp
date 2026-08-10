@@ -108,6 +108,39 @@ function buildIngredientItemsByRecipe(recipes) {
   return map;
 }
 
+// Fields the extraction pipeline computes but nothing in app/src ever reads
+// (grams conversion was explored but the UI only ever needs display/item/
+// unit/quantity_text — see parseIngredientLine.ts's comment on the same
+// tradeoff for imported recipes). Dropping them here cuts the shipped bundle
+// from ~30MB to ~20MB, which matters once it's a real static asset a host
+// has to serve (e.g. Cloudflare Pages' 25MiB per-file limit).
+const DROP_RECIPE_FIELDS = ["confidence", "weighable_count", "total_grams"];
+const DROP_INGREDIENT_FIELDS = [
+  "quantity",
+  "metric",
+  "package_metric",
+  "prep",
+  "grams",
+  "grams_source",
+  "grams_confidence",
+  "weighable",
+  "approx",
+];
+
+function stripUnusedFields(recipe) {
+  const stripped = { ...recipe };
+  for (const field of DROP_RECIPE_FIELDS) delete stripped[field];
+  stripped.ingredient_groups = recipe.ingredient_groups.map((group) => ({
+    ...group,
+    ingredients: group.ingredients.map((ingredient) => {
+      const slim = { ...ingredient };
+      for (const field of DROP_INGREDIENT_FIELDS) delete slim[field];
+      return slim;
+    }),
+  }));
+  return stripped;
+}
+
 function main() {
   const recipes = JSON.parse(
     fs.readFileSync(path.join(ROOT, "recipes_metric.json"), "utf8")
@@ -120,7 +153,7 @@ function main() {
   const bundle = recipes.map((recipe) => {
     const image = imageUrl(manifest[recipe.id]);
     const withImage = { ...recipe, image };
-    return {
+    return stripUnusedFields({
       ...withImage,
       isComponent: looksLikeComponent(withImage, ingredientItemsByRecipe),
       // Ingredients with no method steps at all aren't a lesser recipe, they're a
@@ -128,7 +161,7 @@ function main() {
       // exclude from the deck rather than surface as a "warning" like the softer
       // ones (e.g. "no servings found").
       hasSteps: recipe.steps.length > 0,
-    };
+    });
   });
 
   const componentCount = bundle.filter((r) => r.isComponent).length;
