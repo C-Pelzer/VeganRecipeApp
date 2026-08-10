@@ -1,0 +1,15 @@
+{
+  // Configures Cloudflare's static-asset serving for this Workers project —
+  // NOT a "_redirects" file. A blanket "/* -> /" redirect rule (the classic
+  // Pages SPA-fallback pattern) intercepts every request on this platform,
+  // including real asset paths like /assets/*.js and /manifest.webmanifest,
+  // which is why they came back as HTML instead of their real content.
+  // "single-page-application" only serves index.html when NO real static
+  // file matches the request path — real assets are served as themselves.
+  "name": "veganrecipeapp",
+  "compatibility_date": "2026-01-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
