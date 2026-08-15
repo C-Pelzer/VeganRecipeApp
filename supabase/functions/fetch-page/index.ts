@@ -42,7 +42,8 @@ const CORS_HEADERS = {
 
 const MAX_HTML_BYTES = 5 * 1024 * 1024 // recipe blog pages are never this big
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024 // guard against something absurd before we even try to decode
-const IMAGE_MAX_WIDTH = 480 // "low resolution snapshot" — plenty for a swipe card / detail header
+const IMAGE_MAX_WIDTH = 700 // matches the cookbook pipeline (scripts/extract-images.mjs), so imported
+// cards don't look soft next to book cards on a 3x phone screen
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024 // real camera JPEGs, even high-megapixel ones, land well under this
 const UPLOAD_MAX_WIDTH = 1440 // a post-cook photo is a "hero" photo people look back on, not a thumbnail
 const IMAGE_BUCKET = 'recipe-images'

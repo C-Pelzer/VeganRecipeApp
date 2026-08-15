@@ -55,7 +55,15 @@ export function ImportRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: Im
         const hostedImage = await importedRecipeStore.snapshotImage(recipeToSave.id, recipeToSave.image)
         recipeToSave = { ...recipeToSave, image: hostedImage }
       } catch {
-        // Keep the original external URL — a failed snapshot shouldn't block the import.
+        // Keep the original external URL — a failed snapshot shouldn't block the
+        // import. But record it: a hotlinked image falls outside the PWA's cache
+        // rule (which only matches the Supabase bucket), so the recipe silently
+        // has no photo offline. The warning is also what a later backfill uses to
+        // find these rows.
+        recipeToSave = {
+          ...recipeToSave,
+          warnings: [...recipeToSave.warnings, "Couldn't save a copy of the photo — it won't be available offline."],
+        }
       }
     }
 

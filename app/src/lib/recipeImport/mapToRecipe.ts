@@ -1,12 +1,14 @@
 import { parseIngredientLine } from './parseIngredientLine'
 import {
-  decodeHtmlEntities,
-  findRecipeJsonLd,
+  cleanText,
+  findFallbackImage,
+  findFallbackTitle,
   formatIsoDuration,
   normalizeAuthors,
   normalizeImageUrl,
   normalizeInstructions,
   normalizeServings,
+  parseRecipePage,
 } from './parseJsonLd'
 import { generateId } from '../generateId'
 import type { Recipe } from '../../types/recipe'
@@ -28,18 +30,26 @@ function resolveUrl(url: string, base: string): string | null {
 }
 
 export function importRecipeFromHtml(html: string, sourceUrl: string): ImportResult | null {
-  const jsonLd = findRecipeJsonLd(html)
-  if (!jsonLd || !jsonLd.name) return null
+  const parsed = parseRecipePage(html, sourceUrl)
+  if (!parsed) return null
+  const { jsonLd, graphById, doc } = parsed
 
   const warnings: string[] = []
+
+  // A missing/blank JSON-LD name used to abort the import outright, even though
+  // the page names the recipe in og:title, <h1>, and its own slug.
+  const title = cleanText(jsonLd.name) || findFallbackTitle(doc, sourceUrl)
+  if (!title) return null
+  if (!cleanText(jsonLd.name)) warnings.push('Recipe name was missing — took the title from the page instead.')
+
   const { servings, servingsText } = normalizeServings(jsonLd.recipeYield)
-  const rawImage = normalizeImageUrl(jsonLd.image)
+
+  const rawImage = normalizeImageUrl(jsonLd.image, graphById) ?? findFallbackImage(doc)
   const image = rawImage ? resolveUrl(rawImage, sourceUrl) : null
+
   const timeText = formatIsoDuration(jsonLd.totalTime)
   const steps = normalizeInstructions(jsonLd.recipeInstructions)
-  const ingredients = (jsonLd.recipeIngredient ?? []).map((line) =>
-    parseIngredientLine(decodeHtmlEntities(line)),
-  )
+  const ingredients = (jsonLd.recipeIngredient ?? []).map((line) => parseIngredientLine(cleanText(line)))
 
   if (!image) warnings.push('No image found on the page.')
   if (!timeText) warnings.push('No total time found.')
@@ -55,7 +65,7 @@ export function importRecipeFromHtml(html: string, sourceUrl: string): ImportRes
 
   const recipe: Recipe = {
     id: `imported-${generateId()}`,
-    title: decodeHtmlEntities(jsonLd.name),
+    title,
     source_book: hostname,
     source_file: sourceUrl,
     authors: normalizeAuthors(jsonLd.author),
@@ -63,7 +73,7 @@ export function importRecipeFromHtml(html: string, sourceUrl: string): ImportRes
     servings_text: servingsText,
     time_text: timeText,
     diet_tags: [],
-    headnote: typeof jsonLd.description === 'string' ? decodeHtmlEntities(jsonLd.description) : null,
+    headnote: cleanText(jsonLd.description) || null,
     ingredient_groups: [{ name: null, ingredients }],
     steps,
     notes: [],
@@ -71,7 +81,9 @@ export function importRecipeFromHtml(html: string, sourceUrl: string): ImportRes
     ingredient_count: ingredients.length,
     weighable_count: 0,
     total_grams: 0,
-    confidence: 1,
+    // Best-effort scrape — reflect how much actually came through rather than
+    // claiming full confidence on every page the way this used to.
+    confidence: Math.max(0.2, Number((1 - 0.15 * warnings.length).toFixed(2))),
     warnings,
     image,
     isComponent: false,

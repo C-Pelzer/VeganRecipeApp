@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { importedRecipeStore } from './store/importedRecipeStore'
+import { withNormalizedTitle } from './recipeTitle'
 import type { Recipe } from '../types/recipe'
 
 let staticCache: Promise<Recipe[]> | null = null
@@ -11,10 +12,15 @@ let staticCache: Promise<Recipe[]> | null = null
  */
 function loadStaticRecipes(): Promise<Recipe[]> {
   if (!staticCache) {
-    staticCache = fetch('/data/recipes.json').then((res) => {
-      if (!res.ok) throw new Error(`Failed to load recipe bundle: ${res.status}`)
-      return res.json() as Promise<Recipe[]>
-    })
+    staticCache = fetch('/data/recipes.json')
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to load recipe bundle: ${res.status}`)
+        return res.json() as Promise<Recipe[]>
+      })
+      // Titles are repaired here rather than at each render site so that search,
+      // sorting and deck building all see the same cleaned string. The bundle
+      // itself is generated and stays untouched. See lib/recipeTitle.ts.
+      .then((recipes) => recipes.map(withNormalizedTitle))
   }
   return staticCache
 }
@@ -49,9 +55,11 @@ export function useRecipes(): UseRecipesResult {
       // imported recipe show up right away. If the table doesn't exist yet
       // (schema not run), fall back to an empty list rather than breaking
       // the whole app's recipe loading.
-      Promise.all([loadStaticRecipes(), importedRecipeStore.getAll().catch(() => [])])
+      Promise.all([loadStaticRecipes(), importedRecipeStore.getAll().catch((): Recipe[] => [])])
         .then(([staticRecipes, importedRecipes]) => {
-          if (!cancelled) setRecipes([...staticRecipes, ...importedRecipes])
+          // staticRecipes are already normalized inside loadStaticRecipes (and
+          // cached), so only the imported ones need it on each refetch.
+          if (!cancelled) setRecipes([...staticRecipes, ...importedRecipes.map(withNormalizedTitle)])
         })
         .catch((err) => {
           if (!cancelled) setError(err instanceof Error ? err : new Error(String(err)))
