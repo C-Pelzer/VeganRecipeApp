@@ -122,6 +122,23 @@ function buildDeckRows(groups) {
   return { decks, deckRecipes };
 }
 
+// Must stay in sync with the CHECK constraint on swipe_decks.category — see
+// scripts/schema-swipe-decks-categories.sql. This is a separate constraint from
+// the one on recipe_tags.category, so widening that one is not enough. Decks in
+// any other category are skipped rather than allowed to fail the whole insert:
+// the delete below has already run by then, which would leave the app with no
+// auto decks at all.
+const ALLOWED_DECK_CATEGORIES = new Set([
+  "time",
+  "cuisine",
+  "ingredient",
+  "course",
+  "book",
+  "diet",
+  "effort",
+  "season",
+]);
+
 async function replaceAutoDecks(decks, deckRecipes) {
   // Cascades to swipe_deck_recipes (and swipe_deck_shares, though auto decks
   // shouldn't have any — sharing only applies to manual decks).
@@ -164,13 +181,25 @@ async function main() {
     fetchAll("recipe_tag_overrides", "recipe_id, category, tag_slug, label, action"),
   ]);
 
-  const groups = buildEffectiveTagGroups(recipeTagRows, overrideRows, eligibleRecipeIds);
+  const allGroups = buildEffectiveTagGroups(recipeTagRows, overrideRows, eligibleRecipeIds);
+  const groups = allGroups.filter((g) => ALLOWED_DECK_CATEGORIES.has(g.category));
+  const skipped = allGroups.filter((g) => !ALLOWED_DECK_CATEGORIES.has(g.category));
   const { decks, deckRecipes } = buildDeckRows(groups);
 
   await replaceAutoDecks(decks, deckRecipes);
   printSummary(groups, deckRecipes);
 
   console.log(`\nBuilt ${decks.length} decks from ${groups.length} tags.`);
+
+  if (skipped.length) {
+    const cats = [...new Set(skipped.map((g) => g.category))].sort();
+    console.log(
+      `\n${skipped.length} decks in categories [${cats.join(", ")}] were NOT built: the ` +
+        `swipe_decks.category CHECK constraint doesn't allow them yet.\n` +
+        `Run scripts/schema-swipe-decks-categories.sql in the Supabase SQL editor, add those ` +
+        `names to ALLOWED_DECK_CATEGORIES above, and re-run this script.`
+    );
+  }
 }
 
 main();
