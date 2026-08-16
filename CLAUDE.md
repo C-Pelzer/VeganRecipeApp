@@ -135,3 +135,51 @@ thoughtfully — it's what `TESTING.md`'s airplane-mode check verifies.
   particular is reversed: `DeckScreen` renders via `visible.slice().reverse().map(...)`, so the
   top-of-stack card is *last* in DOM order) and re-query after cleanup to confirm, rather than
   trusting an assumed mapping or an HTTP status code.
+- **Two separate `category` CHECK constraints** guard `recipe_tags.category` and
+  `swipe_decks.category`, and the live database has drifted from the `schema-*.sql` files (the
+  live `swipe_decks` allows `book`, which `schema-swipe-decks.sql` doesn't list). Both scripts
+  delete-then-insert, so a rejected row after the delete leaves the table **empty** — this
+  happened, and it wiped `recipe_tags` mid-run. Before any delete-then-insert against a
+  constrained column, probe the live constraint with a throwaway row (insert, then delete it,
+  then confirm 0 remain) rather than trusting the schema file. Both scripts now hold back rows
+  in disallowed categories instead of failing the batch; `ALLOWED_CATEGORIES` /
+  `ALLOWED_DECK_CATEGORIES` must be widened by hand *after* the matching `alter table` is run.
+- **Deploys ship from GitHub**, not `wrangler deploy` — pushing to `main` triggers the Cloudflare
+  build. There are no wrangler credentials on Cameron's machine, so a manual deploy just fails on
+  auth. The one exception is `supabase/functions/fetch-page`, which is **not** part of that build
+  and has to be pasted into the Supabase dashboard by hand.
+
+## Current state (as of 2026-08-16)
+
+**Recipe titles** are repaired at load time in `app/src/lib/recipeTitle.ts`, called once from
+`loadStaticRecipes()` in `lib/data.ts` so search, sorting and deck building all see the cleaned
+string. `recipes.json` is generated and stays untouched. It fixes three things, and is
+deliberately conservative — a title that already contains lowercase is left completely alone:
+1,750 ALL-CAPS titles title-cased (casing is per-book: every book is ~100% or ~0% caps), 75
+drop-cap splits rejoined (`V ANILLA Y OGURT`, an EPUB decorative first letter in its own span),
+and 59 La Vida Verde titles unwrapped from parentheses (the extractor kept only the English
+translation and dropped the Spanish name).
+
+**Known-unfixable title damage**, recorded in `NewIdeas.txt`: 68 recipes whose title is a yield
+line (`SERVES 2`, mostly Effortless Vegan) — the real name was never extracted, and each sits
+alone in its own source file, so it can't be recovered from the bundle; and 767 partially-capsed
+titles where the book capitalises the hero ingredient on purpose (`Easy Red Lentil DAL`), left
+alone since flattening them would wreck real acronyms. **The source EPUBs are no longer in the
+repo**, so nothing can be re-extracted until they're located.
+
+**Tagging** (`scripts/tag-recipes.mjs`) was reworked from boolean any-keyword-matching to
+evidence-weighted matching: ingredients match the parsed ingredient list with real plural forms
+(`-es`/`-ies`, not `s?`) longest-phrase-first with masking so `sweet potato` blocks `potato`;
+cuisine keywords split strong/weak so a Thai curry isn't also Indian; course keywords carry
+exclusions so Shepherd's Pie isn't a dessert; title evidence outweighs headnote evidence.
+Categories `diet` (from the books' own `diet_tags`, not inferred), `effort` and `season` were
+added. Run `--dry-run` first — it writes `scripts/tag-report.txt` and diffs against the live
+table without writing. `build-swipe-decks.mjs` must be re-run afterwards.
+
+**Not yet done**: the UI pass. An audit found the nav is 8 drawer destinations reached through a
+~16px `☰` target; the header is hand-rolled in all 9 screens with drifting spacing; the recipe
+list row is duplicated 5×; every text input is 14px, which force-zooms Safari on focus;
+`index.css` has no design tokens at all, so colours and radii are retyped per file (four
+different primary button styles); and `DecksHomeScreen`/`FavoritesScreen`/`MealCalendarScreen`
+have fetches with no `.catch`, so a failure sits on "Loading…" forever. Meal Calendar is the
+worst screen — colored bars with no meal names and no breakfast/lunch/dinner row labels.
