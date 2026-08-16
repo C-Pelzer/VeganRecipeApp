@@ -120,30 +120,89 @@ async function handleHtmlFetch(targetUrl: URL): Promise<Response> {
   return jsonResponse({ html: new TextDecoder().decode(bytes), finalUrl: res.url })
 }
 
+// Formats every browser this app runs on can render, but ImageScript can't
+// decode. Rather than fail the snapshot — which left the recipe hotlinking the
+// source site, outside the PWA's offline cache — these are stored byte-for-byte.
+// They're already well compressed, and MAX_IMAGE_BYTES bounds the size.
+const PASSTHROUGH_TYPES: Record<string, string> = {
+  'image/webp': 'webp',
+  'image/avif': 'avif',
+  'image/gif': 'gif',
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+}
+
+// Content-Type headers on image CDNs are unreliable (octet-stream, or plain
+// wrong), so fall back to the magic bytes.
+function sniffImageType(bytes: Uint8Array): string | null {
+  if (bytes.length < 12) return null
+  const b = bytes
+  if (b[0] === 0xff && b[1] === 0xd8) return 'image/jpeg'
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png'
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return 'image/gif'
+  // RIFF....WEBP
+  if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+      b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp'
+  // ....ftyp<brand> — ISO-BMFF. AVIF rides on it, but so do MP4 and MOV, so
+  // check the brand rather than storing a video as an image.
+  if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) {
+    const brand = String.fromCharCode(b[8], b[9], b[10], b[11])
+    if (brand === 'avif' || brand === 'avis' || brand === 'mif1') return 'image/avif'
+  }
+  return null
+}
+
 async function handleImageSnapshot(targetUrl: URL, recipeId: string): Promise<Response> {
-  const res = await fetch(targetUrl, { redirect: 'follow' })
+  const res = await fetch(targetUrl, {
+    // Without a browser-like UA and a same-origin Referer, hotlink-protected
+    // CDNs answer 403 and the recipe silently ends up with no stored photo.
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+      Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+      Referer: targetUrl.origin + '/',
+    },
+    redirect: 'follow',
+  })
   if (!res.ok) return jsonResponse({ error: `Image fetch returned ${res.status}` }, 502)
 
   const bytes = await readCapped(res, MAX_IMAGE_BYTES)
   if (!bytes) return jsonResponse({ error: 'Image too large' }, 502)
 
-  let image: Image
-  try {
-    image = await Image.decode(bytes)
-  } catch {
-    return jsonResponse({ error: 'Unrecognized image format' }, 502)
-  }
-
-  if (image.width > IMAGE_MAX_WIDTH) {
-    image.resize(IMAGE_MAX_WIDTH, Image.RESIZE_AUTO)
-  }
-  const jpeg = await image.encodeJPEG(70)
-
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!)
-  const objectPath = `${recipeId}.jpg`
+
+  let body: Uint8Array
+  let contentType: string
+  let extension: string
+
+  try {
+    const image = await Image.decode(bytes)
+    if (image.width > IMAGE_MAX_WIDTH) {
+      image.resize(IMAGE_MAX_WIDTH, Image.RESIZE_AUTO)
+    }
+    body = await image.encodeJPEG(70)
+    contentType = 'image/jpeg'
+    extension = 'jpg'
+  } catch {
+    // ImageScript handles PNG/JPEG/TIFF only. WebP and AVIF — now the default
+    // from most WordPress image CDNs — land here.
+    const sniffed = sniffImageType(bytes) ?? (res.headers.get('content-type') ?? '').split(';')[0].trim()
+    const passthrough = PASSTHROUGH_TYPES[sniffed]
+    if (!passthrough) {
+      return jsonResponse({ error: `Unrecognized image format${sniffed ? ` (${sniffed})` : ''}` }, 502)
+    }
+    body = bytes
+    contentType = sniffed
+    extension = passthrough
+  }
+
+  // The extension varies, so a re-snapshot that changes format writes a new
+  // object path — which also sidesteps the PWA's CacheFirst rule serving the
+  // previous image forever.
+  const objectPath = `${recipeId}.${extension}`
   const { error: uploadError } = await supabase.storage
     .from(IMAGE_BUCKET)
-    .upload(objectPath, jpeg, { contentType: 'image/jpeg', upsert: true })
+    .upload(objectPath, body, { contentType, upsert: true })
   if (uploadError) return jsonResponse({ error: `Upload failed: ${uploadError.message}` }, 502)
 
   const publicUrl = `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/${IMAGE_BUCKET}/${objectPath}`
