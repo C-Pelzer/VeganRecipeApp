@@ -1,4 +1,4 @@
-1: Create a deck from favorited recipes
-2: Find a better way to show all of the recipe decks. The one big scrollable list is somewhat cumbersome.
-3: We need to implement some sort of Auth through Supabase. I want users to be able to login using their google account, and invite other users to join their group.
-4: Extend the tinder mechanic to movies, tv shows, date night ideas, just about anything you want to decide on as a collective.
+1: We need to implement some sort of Auth through Supabase. I want users to be able to login using their google account, and invite other users to join their group.
+2: Extend the tinder mechanic to movies, tv shows, date night ideas, just about anything you want to decide on as a collective.
+3: Add an "undo" for the last swipe - a quick way to reverse an accidental left/right/remove without having to hunt the recipe back down in a deck.
+4: Let the household get notified when the other person shares a deck or the shopping list changes, instead of only finding out by opening the app and checking.

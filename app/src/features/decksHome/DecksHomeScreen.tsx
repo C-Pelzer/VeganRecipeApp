@@ -219,7 +219,7 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
       <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pb-4">
         <div>
           <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-white/40">Quick Access</p>
-          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {DECKS.map((d) => (
               <DeckCard key={d.id} label={d.label} images={quickAccessImages} onTap={() => goToDeck(d.id)} />
             ))}
@@ -237,7 +237,7 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
             <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-white/40">
               My Decks ({myDecksFiltered.length})
             </p>
-            <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {myDecksFiltered.map(({ deck, share }) => {
                 const recipeIds = homeDecks.recipeIdsByDeck.get(deck.id) ?? []
                 return (
@@ -263,7 +263,7 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
               <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-white/40">
                 {CATEGORY_LABELS[category]} ({decks.length})
               </p>
-              <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {decks.map((deck) => {
                   const recipeIds = homeDecks.recipeIdsByDeck.get(deck.id) ?? []
                   return (
