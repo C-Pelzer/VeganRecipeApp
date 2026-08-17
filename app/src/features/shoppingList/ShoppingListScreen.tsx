@@ -133,7 +133,7 @@ export function ShoppingListScreen({ onOpenMenu }: ShoppingListScreenProps) {
           Nothing here yet — add recipes from Favorites, or add an item above.
         </div>
       ) : (
-        <div className="flex-1 space-y-2 overflow-y-auto">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
           {sorted.map((item) => (
             <label
               key={`${item.itemKey}::${item.unitKey}`}

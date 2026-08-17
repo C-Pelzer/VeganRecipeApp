@@ -216,7 +216,7 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
         className="mb-4 rounded-xl bg-neutral-900 px-3 py-3 text-base text-white placeholder:text-white/40 focus:outline-none"
       />
 
-      <div className="flex-1 space-y-6 overflow-y-auto pb-4">
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pb-4">
         <div>
           <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-white/40">Quick Access</p>
           <div className="grid grid-cols-2 gap-3">

@@ -293,7 +293,7 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
           )}
         </div>
       ) : (
-        <div className="flex-1 space-y-3 overflow-y-auto pb-16">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pb-16">
           {favoriteRecipes.map((recipe) => (
             <div key={recipe.id} className="flex items-center gap-3 rounded-2xl bg-neutral-900 p-3">
               <input

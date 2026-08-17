@@ -127,7 +127,7 @@ export function ImportRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: Im
           {errorMessage && <p className="text-sm text-rose-400">{errorMessage}</p>}
         </div>
       ) : (
-        <div className="flex-1 space-y-4 overflow-y-auto pb-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pb-4">
           <div className="flex gap-3 rounded-2xl bg-neutral-900 p-3">
             <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-neutral-800">
               {result.recipe.image ? (

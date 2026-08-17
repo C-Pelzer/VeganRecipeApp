@@ -149,7 +149,7 @@ export function MealSlotPicker({
               />
             </div>
 
-            <div className="flex-1 space-y-2 overflow-y-auto px-4 pb-4">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-4">
               {visiblePlanned.length === 0 && visibleFavorites.length === 0 ? (
                 <p className="py-6 text-center text-sm text-white/50">
                   {hasAnyRecipes ? 'No matches.' : 'No favorites yet — swipe right on something first.'}

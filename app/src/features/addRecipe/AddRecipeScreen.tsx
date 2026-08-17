@@ -105,7 +105,7 @@ export function AddRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: AddRe
 
       <SegmentedTabs segments={CATALOG_SEGMENTS} activeTo="/add-recipe" />
 
-      <div className="flex-1 space-y-4 overflow-y-auto pb-4">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pb-4">
         <div>
           <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-white/40">Title</p>
           <input

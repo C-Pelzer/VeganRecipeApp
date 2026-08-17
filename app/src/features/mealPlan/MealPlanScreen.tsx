@@ -97,7 +97,7 @@ export function MealPlanScreen({ onOpenMenu, onViewRecipe }: MealPlanScreenProps
           Nothing planned yet — add recipes from Favorites.
         </div>
       ) : (
-        <div className="flex-1 space-y-3 overflow-y-auto">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
           {plannedRecipes.map((recipe) => (
             <div key={recipe.id} className="flex items-center gap-3 rounded-2xl bg-neutral-900 p-3">
               <button
