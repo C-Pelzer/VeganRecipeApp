@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SegmentedTabs } from '../../components/SegmentedTabs'
 import { PLAN_SEGMENTS } from '../../components/segments'
 import { useRecipes } from '../../lib/data'
@@ -7,10 +7,9 @@ import { mealCalendarStore } from '../../lib/store/mealCalendarStore'
 import { mealPlanStore } from '../../lib/store/mealPlanStore'
 import { favoritedRecipeIds, unionFavoriteIds } from '../../lib/favorites'
 import { HOUSEHOLD_MEMBERS, type HouseholdMember } from '../../lib/profile'
-import { addDays, formatWeekRangeLabel, isSameDay, startOfWeek, toDateKey, weekDates } from '../../lib/weekDates'
-import { MealDaySheet } from './MealDaySheet'
+import { addDays, isSameDay, toDateKey } from '../../lib/weekDates'
 import { MealSlotPicker } from './MealSlotPicker'
-import { MEMBER_COLOR, UNASSIGNED_COLOR } from './memberColor'
+import { MEMBER_COLOR } from './memberColor'
 import type { MealCalendarEntry, MealType, Recipe, RecipePriority } from '../../types/recipe'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner']
@@ -25,9 +24,17 @@ interface SlotSelection {
   mealType: MealType
 }
 
+// The carousel runs a fixed window of days rather than paging week by week, so
+// yesterday and tomorrow are always half-visible either side of today and a
+// swipe moves one day, not seven.
+const DAYS_BEFORE = 7
+const DAYS_AFTER = 27
+
 export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScreenProps) {
   const { recipes, error } = useRecipes()
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const [rangeStart] = useState(() => addDays(new Date(), -DAYS_BEFORE))
+  const [focusIndex, setFocusIndex] = useState(DAYS_BEFORE)
   const [entries, setEntries] = useState<MealCalendarEntry[] | null>(null)
   const [entriesError, setEntriesError] = useState<Error | null>(null)
   const [prioritiesByUser, setPrioritiesByUser] = useState<Record<
@@ -35,10 +42,41 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
     RecipePriority[]
   > | null>(null)
   const [activeSlot, setActiveSlot] = useState<SlotSelection | null>(null)
-  const [openDay, setOpenDay] = useState<Date | null>(null)
   const [plannedIds, setPlannedIds] = useState<Set<string> | null>(null)
 
-  const days = useMemo(() => weekDates(weekStart), [weekStart])
+  const days = useMemo(
+    () => Array.from({ length: DAYS_BEFORE + 1 + DAYS_AFTER }, (_, i) => addDays(rangeStart, i)),
+    [rangeStart],
+  )
+
+  // Centres a day without smooth-scrolling on first paint, which would animate
+  // from the far left every time the screen mounts.
+  const scrollToIndex = useCallback((index: number, behavior: ScrollBehavior = 'smooth') => {
+    const scroller = scrollerRef.current
+    const card = scroller?.children[index] as HTMLElement | undefined
+    if (!scroller || !card) return
+    scroller.scrollTo({
+      left: card.offsetLeft - (scroller.clientWidth - card.clientWidth) / 2,
+      behavior,
+    })
+  }, [])
+
+  function handleScroll() {
+    const scroller = scrollerRef.current
+    if (!scroller) return
+    const centre = scroller.scrollLeft + scroller.clientWidth / 2
+    let nearest = 0
+    let best = Infinity
+    for (let i = 0; i < scroller.children.length; i += 1) {
+      const card = scroller.children[i] as HTMLElement
+      const distance = Math.abs(card.offsetLeft + card.clientWidth / 2 - centre)
+      if (distance < best) {
+        best = distance
+        nearest = i
+      }
+    }
+    setFocusIndex(nearest)
+  }
 
   useEffect(() => {
     Promise.all(HOUSEHOLD_MEMBERS.map((user) => store.getPriorities(user))).then((results) => {
@@ -59,7 +97,7 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
   useEffect(() => {
     let cancelled = false
     mealCalendarStore
-      .getEntriesInRange(toDateKey(weekStart), toDateKey(addDays(weekStart, 6)))
+      .getEntriesInRange(toDateKey(rangeStart), toDateKey(addDays(rangeStart, days.length - 1)))
       .then((data) => {
         if (!cancelled) setEntries(data)
       })
@@ -69,7 +107,14 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
     return () => {
       cancelled = true
     }
-  }, [weekStart])
+  }, [rangeStart, days.length])
+
+  // Runs once the cards actually exist — the loading branch returns before the
+  // scroller is mounted, so this can't be done alongside the data fetches.
+  const ready = Boolean(recipes && entries)
+  useEffect(() => {
+    if (ready) scrollToIndex(DAYS_BEFORE, 'auto')
+  }, [ready, scrollToIndex])
 
   const favoriteRecipes = useMemo<Recipe[]>(() => {
     if (!recipes || !prioritiesByUser) return []
@@ -104,12 +149,6 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
     for (const recipe of recipes ?? []) map.set(recipe.id, recipe)
     return map
   }, [recipes])
-
-  function handleSelectMeal(mealType: MealType) {
-    if (!openDay) return
-    setActiveSlot({ date: openDay, mealType })
-    setOpenDay(null)
-  }
 
   function handleSave(recipeId: string, assignedTo: HouseholdMember) {
     if (!activeSlot) return
@@ -155,15 +194,6 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
     ? entryByKey.get(`${toDateKey(activeSlot.date)}|${activeSlot.mealType}`) ?? null
     : null
 
-  function entriesForDay(day: Date): Partial<Record<MealType, MealCalendarEntry>> {
-    const result: Partial<Record<MealType, MealCalendarEntry>> = {}
-    for (const mealType of MEAL_TYPES) {
-      const entry = entryByKey.get(`${toDateKey(day)}|${mealType}`)
-      if (entry) result[mealType] = entry
-    }
-    return result
-  }
-
   return (
     <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
       <div className="mb-4 flex items-center justify-between text-sm">
@@ -178,8 +208,8 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
         <span className="font-medium text-white">Meal Calendar</span>
         <button
           type="button"
-          onClick={() => setWeekStart(startOfWeek(new Date()))}
-          className="text-sm font-medium text-emerald-400"
+          onClick={() => scrollToIndex(DAYS_BEFORE)}
+          className="min-h-11 text-sm font-medium text-emerald-400"
         >
           Today
         </button>
@@ -187,83 +217,81 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
 
       <SegmentedTabs segments={PLAN_SEGMENTS} activeTo="/meal-calendar" />
 
-      <div className="mb-3 flex items-center justify-between">
-        <button
-          type="button"
-          aria-label="Previous week"
-          onClick={() => setWeekStart((current) => addDays(current, -7))}
-          className="px-2 text-lg text-white/50"
-        >
-          ‹
-        </button>
-        <span className="text-sm font-medium text-white/70">{formatWeekRangeLabel(weekStart)}</span>
-        <button
-          type="button"
-          aria-label="Next week"
-          onClick={() => setWeekStart((current) => addDays(current, 7))}
-          className="px-2 text-lg text-white/50"
-        >
-          ›
-        </button>
-      </div>
+      <p className="mb-2 text-center text-sm font-medium text-white/70">
+        {(days[focusIndex] ?? days[0]).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+      </p>
 
-      <div className="flex flex-1 flex-col gap-1 overflow-hidden">
-        <div className="flex gap-1">
-          {days.map((day) => (
+      {/* One tall card per day, neighbours peeking either side. The previous
+          version drew three unlabelled colour bands per day across a 7-column
+          week, which showed who a meal was assigned to but never what it was. */}
+      <div
+        ref={scrollerRef}
+        onScroll={handleScroll}
+        className="-mx-4 flex flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden px-[12%] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {days.map((day, index) => {
+          const isToday = isSameDay(day, new Date())
+          const focused = index === focusIndex
+          return (
             <div
               key={toDateKey(day)}
-              className={`flex-1 rounded-lg py-1 text-center text-xs ${
-                isSameDay(day, new Date()) ? 'bg-emerald-500/20 text-emerald-400' : 'text-white/50'
+              className={`flex w-[76%] shrink-0 snap-center flex-col rounded-2xl border p-3 transition-opacity ${
+                focused ? 'border-neutral-700 bg-neutral-900 opacity-100' : 'border-neutral-800/60 bg-neutral-900/50 opacity-50'
               }`}
             >
-              <p className="font-medium">{day.toLocaleDateString(undefined, { weekday: 'short' })}</p>
-              <p>{day.getDate()}</p>
+              <div className="mb-3 flex items-baseline justify-between">
+                <span className={`text-sm font-semibold ${isToday ? 'text-emerald-400' : 'text-white'}`}>
+                  {isToday ? 'Today' : day.toLocaleDateString(undefined, { weekday: 'long' })}
+                </span>
+                <span className="text-xs text-white/50">
+                  {day.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                </span>
+              </div>
+
+              <div className="flex flex-1 flex-col gap-2">
+                {MEAL_TYPES.map((mealType) => {
+                  const entry = entryByKey.get(`${toDateKey(day)}|${mealType}`)
+                  const recipe = entry ? recipeById.get(entry.recipeId) : undefined
+                  return (
+                    <button
+                      key={mealType}
+                      type="button"
+                      onClick={() => setActiveSlot({ date: day, mealType })}
+                      className="flex flex-1 flex-col rounded-xl bg-neutral-800/70 p-2.5 text-left"
+                    >
+                      <span className="flex items-center gap-1.5 text-[0.625rem] uppercase tracking-wide text-white/40">
+                        {mealType}
+                        {entry && (
+                          <span
+                            aria-label={`Assigned to ${entry.assignedTo}`}
+                            className={`h-1.5 w-1.5 rounded-full ${MEMBER_COLOR[entry.assignedTo]}`}
+                          />
+                        )}
+                      </span>
+                      {/* Centred in the remaining height so an empty slot reads as
+                          a small affordance rather than a large hole. */}
+                      <span className="flex flex-1 items-center">
+                        {recipe ? (
+                          <span className="flex items-center gap-2">
+                            {recipe.image && (
+                              <img src={recipe.image} alt="" className="h-9 w-9 shrink-0 rounded-md object-cover" />
+                            )}
+                            <span className="line-clamp-3 text-xs font-medium leading-snug text-white">
+                              {recipe.title}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-xs text-white/30">＋ Add</span>
+                        )}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-          ))}
-        </div>
-
-        {/* One color band per meal, top-to-bottom = breakfast/lunch/dinner,
-            so which third you're looking at is always the same regardless
-            of the day — tap a day to see recipes and edit. */}
-        <div className="flex flex-1 gap-1">
-          {days.map((day) => (
-            <button
-              key={toDateKey(day)}
-              type="button"
-              onClick={() => setOpenDay(day)}
-              className="flex flex-1 flex-col gap-0.5 overflow-hidden rounded-lg"
-            >
-              {MEAL_TYPES.map((mealType) => {
-                const entry = entryByKey.get(`${toDateKey(day)}|${mealType}`)
-                const color = entry ? MEMBER_COLOR[entry.assignedTo] : UNASSIGNED_COLOR
-                return <span key={mealType} aria-hidden="true" className={`flex-1 ${color}`} />
-              })}
-            </button>
-          ))}
-        </div>
+          )
+        })}
       </div>
-
-      <div className="mt-3 flex items-center justify-center gap-4 text-xs text-white/50">
-        <span className="flex items-center gap-1.5">
-          <span className={`h-2.5 w-2.5 rounded-full ${UNASSIGNED_COLOR}`} /> Unassigned
-        </span>
-        {HOUSEHOLD_MEMBERS.map((member) => (
-          <span key={member} className="flex items-center gap-1.5">
-            <span className={`h-2.5 w-2.5 rounded-full ${MEMBER_COLOR[member]}`} /> {member}
-          </span>
-        ))}
-      </div>
-
-      {openDay && (
-        <MealDaySheet
-          isOpen={true}
-          date={openDay}
-          entries={entriesForDay(openDay)}
-          recipeById={recipeById}
-          onSelectMeal={handleSelectMeal}
-          onClose={() => setOpenDay(null)}
-        />
-      )}
 
       {activeSlot && (
         <MealSlotPicker
