@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BottomTabBar } from './components/BottomTabBar'
 import { NavDrawer } from './components/NavDrawer'
 import { RecipeDetailModal } from './components/RecipeDetailModal'
 import { DeckScreen } from './features/deck/DeckScreen'
@@ -53,6 +54,7 @@ function App() {
             onClose={() => setMenuOpen(false)}
             currentUser={currentUser}
             onSwitchUser={handleSwitchUser}
+            onSwitchTo={handleSelect}
           />
           <RecipeDetailModal
             recipeId={viewingRecipeId}
@@ -130,7 +132,10 @@ function App() {
                 />
               }
             />
+            {/* An unknown URL used to render a blank black page. */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          <BottomTabBar currentUser={currentUser} />
         </BrowserRouter>
       ) : (
         <ProfilePicker onSelect={handleSelect} />

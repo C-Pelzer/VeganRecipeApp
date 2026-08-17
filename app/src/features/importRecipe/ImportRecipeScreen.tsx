@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { SegmentedTabs } from '../../components/SegmentedTabs'
+import { CATALOG_SEGMENTS } from '../../components/segments'
 import { invalidateImportedRecipes } from '../../lib/data'
 import { importedRecipeStore } from '../../lib/store/importedRecipeStore'
 import { importRecipeFromHtml, type ImportResult } from '../../lib/recipeImport/mapToRecipe'
@@ -87,7 +89,7 @@ export function ImportRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: Im
   }
 
   return (
-    <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
       <div className="mb-4 flex items-center justify-between text-sm">
         <button
           type="button"
@@ -97,9 +99,11 @@ export function ImportRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: Im
         >
           ☰
         </button>
-        <span className="font-medium text-white">Import Recipe</span>
+        <span className="font-medium text-white">Add a Recipe</span>
         <span className="w-4" />
       </div>
+
+      <SegmentedTabs segments={CATALOG_SEGMENTS} activeTo="/import" />
 
       {!result ? (
         <div className="flex flex-col gap-3">

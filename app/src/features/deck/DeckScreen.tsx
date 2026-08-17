@@ -159,7 +159,7 @@ export function DeckScreen({ currentUser, onOpenMenu, onViewRecipe }: DeckScreen
   const reviewed = sessionTotal - queue.length
 
   return (
-    <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
       <div className="mb-3 flex items-center justify-between text-sm text-white/50">
         <button
           type="button"

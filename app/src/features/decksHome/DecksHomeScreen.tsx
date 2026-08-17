@@ -189,7 +189,7 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
   const noDecksYet = homeDecks.myDecks.length === 0 && homeDecks.categoryDecks.length === 0
 
   return (
-    <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
       <div className="mb-4 flex items-center justify-between text-sm">
         <button
           type="button"

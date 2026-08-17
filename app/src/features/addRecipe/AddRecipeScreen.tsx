@@ -1,4 +1,6 @@
 import { useState, type ChangeEvent } from 'react'
+import { SegmentedTabs } from '../../components/SegmentedTabs'
+import { CATALOG_SEGMENTS } from '../../components/segments'
 import { invalidateImportedRecipes } from '../../lib/data'
 import { generateId } from '../../lib/generateId'
 import { buildManualRecipe } from '../../lib/recipeImport/buildManualRecipe'
@@ -87,7 +89,7 @@ export function AddRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: AddRe
   }
 
   return (
-    <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
       <div className="mb-4 flex items-center justify-between text-sm">
         <button
           type="button"
@@ -97,9 +99,11 @@ export function AddRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: AddRe
         >
           ☰
         </button>
-        <span className="font-medium text-white">Add Recipe</span>
+        <span className="font-medium text-white">Add a Recipe</span>
         <span className="w-4" />
       </div>
+
+      <SegmentedTabs segments={CATALOG_SEGMENTS} activeTo="/add-recipe" />
 
       <div className="flex-1 space-y-4 overflow-y-auto pb-4">
         <div>

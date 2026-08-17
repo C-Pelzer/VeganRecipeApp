@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { SegmentedTabs } from '../../components/SegmentedTabs'
+import { CATALOG_SEGMENTS } from '../../components/segments'
 import { useNavigate } from 'react-router-dom'
 import { useRecipes } from '../../lib/data'
 import { deckStore } from '../../lib/store/deckStore'
@@ -93,7 +95,7 @@ export function CatalogScreen({ currentUser, onOpenMenu, onViewRecipe }: Catalog
   }
 
   return (
-    <div className="relative flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div className="relative flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
       <div className="mb-4 flex items-center justify-between text-sm">
         <button
           type="button"
@@ -114,6 +116,8 @@ export function CatalogScreen({ currentUser, onOpenMenu, onViewRecipe }: Catalog
           {selecting ? 'Cancel' : 'Build Deck'}
         </button>
       </div>
+
+      <SegmentedTabs segments={CATALOG_SEGMENTS} activeTo="/catalog" />
 
       <div className="mb-4 flex items-center justify-between gap-3">
         <input
@@ -175,7 +179,7 @@ export function CatalogScreen({ currentUser, onOpenMenu, onViewRecipe }: Catalog
         <button
           type="button"
           onClick={() => setNaming(true)}
-          className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-neutral-950 shadow-lg"
+          className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-neutral-950 shadow-lg"
         >
           Create Deck ({selectedIds.size})
         </button>

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { SegmentedTabs } from '../../components/SegmentedTabs'
+import { PLAN_SEGMENTS } from '../../components/segments'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { useRecipes } from '../../lib/data'
 import { mealPlanStore } from '../../lib/store/mealPlanStore'
@@ -67,7 +69,7 @@ export function MealPlanScreen({ onOpenMenu, onViewRecipe }: MealPlanScreenProps
   }
 
   return (
-    <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
       <div className="mb-4 flex items-center justify-between text-sm">
         <button
           type="button"
@@ -87,6 +89,8 @@ export function MealPlanScreen({ onOpenMenu, onViewRecipe }: MealPlanScreenProps
           Clear
         </button>
       </div>
+
+      <SegmentedTabs segments={PLAN_SEGMENTS} activeTo="/meal-plan" />
 
       {plannedRecipes.length === 0 ? (
         <div className="flex flex-1 items-center justify-center text-center text-white/60">

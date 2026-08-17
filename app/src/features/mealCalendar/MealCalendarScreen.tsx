@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { SegmentedTabs } from '../../components/SegmentedTabs'
+import { PLAN_SEGMENTS } from '../../components/segments'
 import { useRecipes } from '../../lib/data'
 import { store } from '../../lib/store/supabaseStore'
 import { mealCalendarStore } from '../../lib/store/mealCalendarStore'
@@ -163,7 +165,7 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
   }
 
   return (
-    <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div className="flex h-full flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
       <div className="mb-4 flex items-center justify-between text-sm">
         <button
           type="button"
@@ -182,6 +184,8 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
           Today
         </button>
       </div>
+
+      <SegmentedTabs segments={PLAN_SEGMENTS} activeTo="/meal-calendar" />
 
       <div className="mb-3 flex items-center justify-between">
         <button
