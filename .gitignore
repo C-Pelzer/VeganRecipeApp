@@ -14,3 +14,4 @@ scripts/upload-manifest.json
 # recipes_metric.json (the real source of truth) stays tracked.
 /recipes.json
 /report.json
+scripts/tag-report.txt

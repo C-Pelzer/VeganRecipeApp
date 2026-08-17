@@ -15,4 +15,9 @@ export interface SyncStore {
     direction: SwipeDirection,
     deckId: string,
   ): Promise<RecipePriority>
+  /**
+   * Drops `favorited` back to false without touching priority/removedAt —
+   * unlike a down-swipe, the recipe stays in the deck pool and can resurface.
+   */
+  unfavorite(userId: string, recipeId: string): Promise<RecipePriority>
 }

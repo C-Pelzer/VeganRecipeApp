@@ -16,6 +16,8 @@ interface SwipeCardProps {
   stackDepth: number
   onSwipe: (recipeId: string, direction: SwipeDirection) => void
   onViewDetails: (recipeId: string) => void
+  /** Gates a 'down' swipe — resolving false springs the card back to center instead of flying off. */
+  confirmRemove: () => Promise<boolean>
 }
 
 export interface SwipeCardHandle {
@@ -23,7 +25,7 @@ export interface SwipeCardHandle {
 }
 
 export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function SwipeCard(
-  { recipe, isTop, stackDepth, onSwipe, onViewDetails },
+  { recipe, isTop, stackDepth, onSwipe, onViewDetails, confirmRemove },
   ref,
 ) {
   const x = useMotionValue(0)
@@ -37,10 +39,33 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
   // updates unmount it — without this guard, the fly-off animation restarts
   // and onSwipe fires a second time for the same card.
   const hasSwipedRef = useRef(false)
+  // A 'down' swipe/tap awaits confirmRemove() before hasSwipedRef is set, so a
+  // second one fired while the dialog is still open needs its own guard.
+  const confirmPendingRef = useRef(false)
   const dragDistanceRef = useRef(0)
+
+  function springBack() {
+    controls.start({
+      x: 0,
+      y: 0,
+      rotate: 0,
+      transition: { type: 'spring', stiffness: 400, damping: 30 },
+    })
+  }
 
   async function flyOffScreen(direction: SwipeDirection) {
     if (hasSwipedRef.current) return
+    if (direction === 'down') {
+      if (confirmPendingRef.current) return
+      confirmPendingRef.current = true
+      const confirmed = await confirmRemove()
+      confirmPendingRef.current = false
+      if (!confirmed) {
+        springBack()
+        return
+      }
+      if (hasSwipedRef.current) return
+    }
     hasSwipedRef.current = true
     const exit =
       direction === 'down'
@@ -89,12 +114,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
         return
       }
     }
-    controls.start({
-      x: 0,
-      y: 0,
-      rotate: 0,
-      transition: { type: 'spring', stiffness: 400, damping: 30 },
-    })
+    springBack()
   }
 
   return (

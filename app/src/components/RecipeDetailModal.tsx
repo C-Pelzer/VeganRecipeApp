@@ -6,6 +6,7 @@ import { recipeOverrideStore } from '../lib/store/recipeOverrideStore'
 import { recipePhotoStore } from '../lib/store/recipePhotoStore'
 import { recipeTagOverrideStore } from '../lib/store/recipeTagOverrideStore'
 import { effectiveTagsByRecipe, groupByCategory, useRecipeTagOverrides, useRecipeTags } from '../lib/tags'
+import { provenanceLabel } from '../lib/recipeProvenance'
 import type { Ingredient, IngredientGroup, Recipe, RecipeOverride, RecipePhoto, TagCategory } from '../types/recipe'
 
 // One item/step per line, blank lines dropped.
@@ -117,6 +118,7 @@ export function RecipeDetailModal({ recipeId, currentUser, onClose }: RecipeDeta
     course: '',
   })
 
+  const provenance = recipe ? provenanceLabel(recipe) : null
   const knownTagsByCategory = useMemo(() => groupByCategory(tags ?? []), [tags])
   const effectiveTags = useMemo(
     () => (recipeId && tags && overrides ? effectiveTagsByRecipe(tags, overrides).get(recipeId) ?? [] : []),
@@ -427,6 +429,11 @@ export function RecipeDetailModal({ recipeId, currentUser, onClose }: RecipeDeta
                   <h2 className="mb-2 text-lg font-semibold text-white">Tags</h2>
                   {isEditing ? (
                     <div className="space-y-4">
+                      {provenance && (
+                        <span className="inline-block rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300">
+                          {provenance}
+                        </span>
+                      )}
                       {TAG_CATEGORY_ORDER.map((category) => (
                         <div key={category}>
                           <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-white/40">
@@ -475,8 +482,13 @@ export function RecipeDetailModal({ recipeId, currentUser, onClose }: RecipeDeta
                         </div>
                       ))}
                     </div>
-                  ) : effectiveTags.length > 0 ? (
+                  ) : provenance || effectiveTags.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
+                      {provenance && (
+                        <span className="rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300">
+                          {provenance}
+                        </span>
+                      )}
                       {effectiveTags.map((tag) => (
                         <span
                           key={`${tag.category}::${tag.tagSlug}`}

@@ -5,12 +5,18 @@ import type { SyncStore } from './types'
 import type { RecipePriority, SwipeDirection } from '../../types/recipe'
 
 const PENDING_KEY = 'recipe-app:pendingSwipes'
+const PENDING_UNFAVORITE_KEY = 'recipe-app:pendingUnfavorites'
 
 interface PendingSwipe {
   userId: string
   recipeId: string
   direction: SwipeDirection
   deckId: string
+}
+
+interface PendingUnfavorite {
+  userId: string
+  recipeId: string
 }
 
 interface PriorityRow {
@@ -45,6 +51,20 @@ function readPending(): PendingSwipe[] {
 
 function writePending(pending: PendingSwipe[]) {
   localStorage.setItem(PENDING_KEY, JSON.stringify(pending))
+}
+
+function readPendingUnfavorites(): PendingUnfavorite[] {
+  const raw = localStorage.getItem(PENDING_UNFAVORITE_KEY)
+  if (!raw) return []
+  try {
+    return JSON.parse(raw) as PendingUnfavorite[]
+  } catch {
+    return []
+  }
+}
+
+function writePendingUnfavorites(pending: PendingUnfavorite[]) {
+  localStorage.setItem(PENDING_UNFAVORITE_KEY, JSON.stringify(pending))
 }
 
 /**
@@ -84,8 +104,30 @@ export class SupabaseStore implements SyncStore {
     writePending(stillPending)
   }
 
+  private async callUnfavorite(userId: string, recipeId: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('recipe_priority')
+      .update({ favorited: false, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('recipe_id', recipeId)
+    if (error) console.warn('unfavorite update failed', error)
+    return !error
+  }
+
+  private async flushPendingUnfavorites() {
+    const pending = readPendingUnfavorites()
+    if (!pending.length) return
+    const stillPending: PendingUnfavorite[] = []
+    for (const u of pending) {
+      const ok = await this.callUnfavorite(u.userId, u.recipeId)
+      if (!ok) stillPending.push(u)
+    }
+    writePendingUnfavorites(stillPending)
+  }
+
   async getPriorities(userId: string): Promise<RecipePriority[]> {
     await this.flushPending()
+    await this.flushPendingUnfavorites()
     try {
       // Paginated: with 4800+ recipes in the pool, a household member who's
       // swiped through more than 1000 of them would otherwise silently lose
@@ -123,6 +165,19 @@ export class SupabaseStore implements SyncStore {
     }
     await this.cache.setPriority(result)
     return result
+  }
+
+  async unfavorite(userId: string, recipeId: string): Promise<RecipePriority> {
+    const optimistic = await this.cache.unfavorite(userId, recipeId)
+
+    const ok = await this.callUnfavorite(userId, recipeId)
+    if (!ok) {
+      const pending = readPendingUnfavorites().filter(
+        (u) => !(u.userId === userId && u.recipeId === recipeId),
+      )
+      writePendingUnfavorites([...pending, { userId, recipeId }])
+    }
+    return optimistic
   }
 }
 

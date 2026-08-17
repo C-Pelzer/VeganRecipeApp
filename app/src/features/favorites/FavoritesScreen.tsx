@@ -4,6 +4,9 @@ import { useRecipes } from '../../lib/data'
 import { store } from '../../lib/store/supabaseStore'
 import { shoppingListStore } from '../../lib/store/shoppingListStore'
 import { mealPlanStore } from '../../lib/store/mealPlanStore'
+import { deckStore } from '../../lib/store/deckStore'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { provenanceLabel } from '../../lib/recipeProvenance'
 import { favoritedRecipeIds, sharedFavoriteIds } from '../../lib/favorites'
  import { effectiveTagsByRecipe, useRecipeTagOverrides, useRecipeTags } from '../../lib/tags'
 import { HOUSEHOLD_MEMBERS, type HouseholdMember } from '../../lib/profile'
@@ -26,6 +29,7 @@ const SORTS: { key: SortKey; label: string }[] = [
 // filters, and the chip row has to stay scannable.
 const FILTER_CATEGORIES: TagCategory[] = ['course', 'time', 'effort']
 const MAX_CHIPS = 12
+const MAX_DECK_SIZE = 40
 
 interface FavoritesScreenProps {
   currentUser: HouseholdMember
@@ -45,6 +49,12 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
   const [addingToList, setAddingToList] = useState(false)
   const [sort, setSort] = useState<SortKey>('recent')
   const [activeChips, setActiveChips] = useState<Set<string>>(new Set())
+  const [naming, setNaming] = useState(false)
+  const [deckLabel, setDeckLabel] = useState('')
+  const [creatingDeck, setCreatingDeck] = useState(false)
+  const [createDeckError, setCreateDeckError] = useState<string | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<Recipe | null>(null)
+  const [removing, setRemoving] = useState(false)
   const { tags } = useRecipeTags()
   const { overrides } = useRecipeTagOverrides()
 
@@ -57,7 +67,7 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
     setSelectedIds((current) => {
       const next = new Set(current)
       if (next.has(recipeId)) next.delete(recipeId)
-      else next.add(recipeId)
+      else if (next.size < MAX_DECK_SIZE) next.add(recipeId)
       return next
     })
   }
@@ -77,6 +87,51 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
       // The button is disabled while this runs, so a rejection without this
       // left it stuck disabled with no way to retry.
       .catch(() => setAddingToList(false))
+  }
+
+  function handleCreateDeck() {
+    const label = deckLabel.trim()
+    if (!label || selectedIds.size === 0) return
+    setCreatingDeck(true)
+    setCreateDeckError(null)
+    deckStore
+      .createDeck(label, [...selectedIds], currentUser)
+      .then((deck) => {
+        setNaming(false)
+        setSelectedIds(new Set())
+        setDeckLabel('')
+        navigate(`/deck/${deck.id}`)
+      })
+      .catch((err) => setCreateDeckError(err instanceof Error ? err.message : 'Something went wrong.'))
+      .finally(() => setCreatingDeck(false))
+  }
+
+  function handleConfirmRemove() {
+    if (!removeTarget) return
+    const recipeId = removeTarget.id
+    setRemoving(true)
+    store
+      .unfavorite(currentUser, recipeId)
+      .then((result) => {
+        setPrioritiesByUser((current) => {
+          if (!current) return current
+          return {
+            ...current,
+            [currentUser]: [
+              ...current[currentUser].filter((p) => p.recipeId !== recipeId),
+              result,
+            ],
+          }
+        })
+        setSelectedIds((current) => {
+          if (!current.has(recipeId)) return current
+          const next = new Set(current)
+          next.delete(recipeId)
+          return next
+        })
+        setRemoveTarget(null)
+      })
+      .finally(() => setRemoving(false))
   }
 
   useEffect(() => {
@@ -300,8 +355,9 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
                 type="checkbox"
                 aria-label={`Select ${recipe.title}`}
                 checked={selectedIds.has(recipe.id)}
+                disabled={!selectedIds.has(recipe.id) && selectedIds.size >= MAX_DECK_SIZE}
                 onChange={() => toggleSelected(recipe.id)}
-                className="h-5 w-5 shrink-0 accent-emerald-500"
+                className="h-5 w-5 shrink-0 accent-emerald-500 disabled:opacity-30"
               />
               <button
                 type="button"
@@ -316,28 +372,104 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs uppercase tracking-wide text-white/50">
-                    {recipe.source_book}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="truncate text-xs uppercase tracking-wide text-white/50">
+                      {recipe.source_book}
+                    </p>
+                    {provenanceLabel(recipe) && (
+                      <span className="shrink-0 rounded-full border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-300">
+                        {provenanceLabel(recipe)}
+                      </span>
+                    )}
+                  </div>
                   <p className="truncate font-medium text-white">{recipe.title}</p>
                   <p className="text-xs text-white/50">{recipe.ingredient_count} ingredients</p>
                 </div>
+              </button>
+              <button
+                type="button"
+                aria-label={`Remove ${recipe.title} from favorites`}
+                onClick={() => setRemoveTarget(recipe)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base text-white/40"
+              >
+                🗑
               </button>
             </div>
           ))}
         </div>
       )}
 
-      {selectedIds.size > 0 && (
-        <button
-          type="button"
-          onClick={handleAddToShoppingList}
-          disabled={addingToList}
-          className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-neutral-950 shadow-lg disabled:opacity-60"
-        >
-          {addingToList ? 'Adding…' : `Add ${selectedIds.size} to Shopping List`}
-        </button>
+      {selectedIds.size > 0 && !naming && (
+        <div className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] left-1/2 flex -translate-x-1/2 gap-2">
+          <button
+            type="button"
+            onClick={handleAddToShoppingList}
+            disabled={addingToList}
+            className="rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-neutral-950 shadow-lg disabled:opacity-60"
+          >
+            {addingToList ? 'Adding…' : `Add ${selectedIds.size} to List`}
+          </button>
+          <button
+            type="button"
+            onClick={() => setNaming(true)}
+            className="rounded-full bg-neutral-800 px-5 py-3 text-sm font-semibold text-white shadow-lg"
+          >
+            Make Deck
+          </button>
+        </div>
       )}
+
+      {naming && (
+        <>
+          <div
+            onClick={() => !creatingDeck && setNaming(false)}
+            className="fixed inset-0 z-40 bg-black/60"
+          />
+          <div className="fixed left-1/2 top-1/2 z-50 w-72 -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-neutral-900 p-4 text-white">
+            <h2 className="text-base font-semibold">Name this deck</h2>
+            <input
+              type="text"
+              autoFocus
+              placeholder="e.g. Weeknight Favorites"
+              value={deckLabel}
+              onChange={(e) => setDeckLabel(e.target.value)}
+              className="mt-3 w-full rounded-xl bg-neutral-800 px-3 py-2 text-base text-white placeholder:text-white/40 focus:outline-none"
+            />
+            {createDeckError && <p className="mt-2 text-xs text-rose-400">{createDeckError}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setNaming(false)}
+                disabled={creatingDeck}
+                className="rounded-full px-4 py-2 text-sm font-medium text-white/70 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateDeck}
+                disabled={creatingDeck || !deckLabel.trim()}
+                className="rounded-full bg-emerald-500 px-4 py-2 text-sm font-medium text-neutral-950 disabled:opacity-50"
+              >
+                {creatingDeck ? 'Creating…' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      <ConfirmDialog
+        isOpen={removeTarget !== null}
+        title="Remove from favorites?"
+        message={
+          removeTarget
+            ? `"${removeTarget.title}" will still turn up in your decks — swipe right again to re-favorite it.`
+            : ''
+        }
+        confirmLabel={removing ? 'Removing…' : 'Remove'}
+        onConfirm={handleConfirmRemove}
+        onCancel={() => !removing && setRemoveTarget(null)}
+      />
     </div>
   )
 }

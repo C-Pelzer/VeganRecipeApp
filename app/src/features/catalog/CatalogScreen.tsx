@@ -4,6 +4,7 @@ import { CATALOG_SEGMENTS } from '../../components/segments'
 import { useNavigate } from 'react-router-dom'
 import { useRecipes } from '../../lib/data'
 import { deckStore } from '../../lib/store/deckStore'
+import { provenanceLabel } from '../../lib/recipeProvenance'
 import type { HouseholdMember } from '../../lib/profile'
 import type { Recipe } from '../../types/recipe'
 
@@ -163,9 +164,16 @@ export function CatalogScreen({ currentUser, onOpenMenu, onViewRecipe }: Catalog
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs uppercase tracking-wide text-white/50">
-                    {recipe.source_book}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="truncate text-xs uppercase tracking-wide text-white/50">
+                      {recipe.source_book}
+                    </p>
+                    {provenanceLabel(recipe) && (
+                      <span className="shrink-0 rounded-full border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-300">
+                        {provenanceLabel(recipe)}
+                      </span>
+                    )}
+                  </div>
                   <p className="truncate font-medium text-white">{recipe.title}</p>
                   <p className="text-xs text-white/50">{recipe.ingredient_count} ingredients</p>
                 </div>

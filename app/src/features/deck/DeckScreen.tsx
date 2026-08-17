@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useRecipes } from '../../lib/data'
 import { store } from '../../lib/store/supabaseStore'
 import { deckStore } from '../../lib/store/deckStore'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import type { HouseholdMember } from '../../lib/profile'
 import type { Deck, Recipe, RecipePriority, SwipeDirection } from '../../types/recipe'
 import { SwipeCard, type SwipeCardHandle } from './SwipeCard'
@@ -109,6 +110,8 @@ export function DeckScreen({ currentUser, onOpenMenu, onViewRecipe }: DeckScreen
   // whenever the deck changes, since that's effectively a new session.
   const [sessionTotal, setSessionTotal] = useState<number | null>(null)
   const topCardRef = useRef<SwipeCardHandle>(null)
+  const [confirmingRemove, setConfirmingRemove] = useState<Recipe | null>(null)
+  const removeResolveRef = useRef<((confirmed: boolean) => void) | null>(null)
 
   useEffect(() => {
     store.getPriorities(currentUser).then((p) => {
@@ -138,6 +141,22 @@ export function DeckScreen({ currentUser, onOpenMenu, onViewRecipe }: DeckScreen
     // Filter by id rather than slicing the front — correct even if this fires
     // out of order relative to the queue's current state.
     setQueue((q) => q.filter((r) => r.id !== recipeId))
+  }
+
+  // A down-swipe sets removedAt, which is sticky and takes the recipe out of
+  // every deck's pool for good — unlike left/right it can't be undone by
+  // swiping again later, so it gets a confirm step the other directions don't.
+  function confirmRemove(recipe: Recipe): Promise<boolean> {
+    return new Promise((resolve) => {
+      setConfirmingRemove(recipe)
+      removeResolveRef.current = resolve
+    })
+  }
+
+  function resolveConfirmRemove(confirmed: boolean) {
+    removeResolveRef.current?.(confirmed)
+    removeResolveRef.current = null
+    setConfirmingRemove(null)
   }
 
   if (error || deckError) {
@@ -200,6 +219,7 @@ export function DeckScreen({ currentUser, onOpenMenu, onViewRecipe }: DeckScreen
                   stackDepth={stackDepth}
                   onSwipe={handleSwipe}
                   onViewDetails={onViewRecipe}
+                  confirmRemove={() => confirmRemove(recipe)}
                 />
               )
             })
@@ -234,6 +254,19 @@ export function DeckScreen({ currentUser, onOpenMenu, onViewRecipe }: DeckScreen
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmingRemove !== null}
+        title="Remove this recipe?"
+        message={
+          confirmingRemove
+            ? `"${confirmingRemove.title}" won't show up in your decks again.`
+            : ''
+        }
+        confirmLabel="Remove"
+        onConfirm={() => resolveConfirmRemove(true)}
+        onCancel={() => resolveConfirmRemove(false)}
+      />
     </div>
   )
 }

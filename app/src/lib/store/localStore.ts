@@ -71,6 +71,18 @@ export class LocalStore implements SyncStore {
     return updated
   }
 
+  async unfavorite(userId: string, recipeId: string): Promise<RecipePriority> {
+    const all = readAll()
+    const current = all.find((p) => p.userId === userId && p.recipeId === recipeId)
+    const updated: RecipePriority = {
+      ...(current ?? { userId, recipeId, priority: 5, favorited: false, removedAt: null, updatedAt: '' }),
+      favorited: false,
+      updatedAt: new Date().toISOString(),
+    }
+    await this.setPriority(updated)
+    return updated
+  }
+
   /** Overwrites the cache with an authoritative value (e.g. from the server) — not arithmetic. */
   async setPriority(priority: RecipePriority): Promise<void> {
     const without = readAll().filter(

@@ -1,23 +1,4 @@
-Here I'm going to add some additional features that I want to add.
-
-1: I want to be able to extend the Tinder style to other things, like movies, or activities.
-2: Make sure the potato tag/deck only includes recipes with regular potatoes, not sweet potatoes - they're different ingredients and are getting conflated somewhere in the tagging.
-
-Known data problems in the book-extracted recipes (found 2026-08-14, not yet fixed):
-
-3: 68 recipes have a yield/timing line as their title instead of a recipe name -
-   "SERVES 2", "COOK TIME: 30 MINUTES - SERVES 4". Mostly from Effortless Vegan.
-   The real title was lost at extraction time, so these can't be repaired from the
-   bundle - they'd need a re-extract from the EPUB, or to be hidden from the catalog.
-
-4: 767 titles are partially capitalized - the book puts the hero ingredient in caps
-   ("Simple SNOW PEAS with Red Curry Coconut Broth", "Easy Red Lentil DAL"). 555 are
-   from The Ultimate Vegan Cookbook. Left alone deliberately for now: it's the book's
-   own styling, and flattening it risks wrecking real acronyms like BBQ.
-
-5: The 59 La Vida Verde recipes now read as their English names ("Black Beans") because
-   the extractor dropped the Spanish name. If the EPUB turns up, re-extract to get
-   "Frijoles Negros (Black Beans)" back.
-
-6: The source EPUBs are no longer in the repo, so nothing above can be re-extracted
-   until those files are located.
+1: Create a deck from favorited recipes
+2: Find a better way to show all of the recipe decks. The one big scrollable list is somewhat cumbersome.
+3: We need to implement some sort of Auth through Supabase. I want users to be able to login using their google account, and invite other users to join their group.
+4: Extend the tinder mechanic to movies, tv shows, date night ideas, just about anything you want to decide on as a collective.
