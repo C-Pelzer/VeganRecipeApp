@@ -44,7 +44,7 @@ create trigger on_auth_user_created
   for each row execute function handle_new_user();
 
 -- Reads the caller's own household_id — every other table's RLS policy
--- (see scripts/migrate-existing-household.sql) is scoped through this.
+-- (see scripts/reset-to-household-schema.sql) is scoped through this.
 create or replace function current_household_id()
 returns uuid as $$
   select household_id from profiles where id = auth.uid();

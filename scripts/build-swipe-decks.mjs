@@ -9,7 +9,7 @@
 // to one), so — unlike the app's own effectiveTagsByRecipe
 // (app/src/lib/tags.ts) — this deliberately does NOT layer
 // recipe_tag_overrides on top: those are now a household's personal tag
-// edits (scripts/migrate-existing-household.sql), which can't coherently
+// edits (scripts/reset-to-household-schema.sql), which can't coherently
 // apply to a deck shared across households. This script runs with the anon
 // key and no signed-in session, so it couldn't read that table even if it
 // tried — RLS scopes it to authenticated household members only.
@@ -20,7 +20,7 @@
 //
 // Usage: node --env-file=.env build-swipe-decks.mjs
 // (requires scripts/schema-swipe-decks.sql to have been run first, and
-// scripts/migrate-existing-household.sql if running against a database that
+// scripts/reset-to-household-schema.sql if running against a database that
 // still has the pre-household-auth swipe_decks shape)
 
 import { createClient } from "@supabase/supabase-js";
