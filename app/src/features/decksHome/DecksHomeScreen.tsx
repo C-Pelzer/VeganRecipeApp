@@ -53,7 +53,7 @@ function DeckCard({ label, images, subtitle, unseen, onTap }: DeckCardProps) {
     <button
       type="button"
       onClick={onTap}
-      className="relative aspect-square overflow-hidden rounded-2xl bg-neutral-800 text-left"
+      className="relative aspect-square w-40 shrink-0 overflow-hidden rounded-2xl bg-neutral-800 text-left"
     >
       {images.length === 0 ? (
         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-800 to-neutral-900 text-4xl">
@@ -219,7 +219,7 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
       <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pb-4">
         <div>
           <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-white/40">Quick Access</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {DECKS.map((d) => (
               <DeckCard key={d.id} label={d.label} images={quickAccessImages} onTap={() => goToDeck(d.id)} />
             ))}
@@ -234,8 +234,10 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
 
         {myDecksFiltered.length > 0 && (
           <div>
-            <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-white/40">My Decks</p>
-            <div className="grid grid-cols-2 gap-3">
+            <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-white/40">
+              My Decks ({myDecksFiltered.length})
+            </p>
+            <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {myDecksFiltered.map(({ deck, share }) => {
                 const recipeIds = homeDecks.recipeIdsByDeck.get(deck.id) ?? []
                 return (
@@ -259,9 +261,9 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
           return (
             <div key={category}>
               <p className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-white/40">
-                {CATEGORY_LABELS[category]}
+                {CATEGORY_LABELS[category]} ({decks.length})
               </p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {decks.map((deck) => {
                   const recipeIds = homeDecks.recipeIdsByDeck.get(deck.id) ?? []
                   return (

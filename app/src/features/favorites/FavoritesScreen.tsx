@@ -400,19 +400,19 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
       )}
 
       {selectedIds.size > 0 && !naming && (
-        <div className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] left-1/2 flex -translate-x-1/2 gap-2">
+        <div className="absolute inset-x-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] flex gap-2">
           <button
             type="button"
             onClick={handleAddToShoppingList}
             disabled={addingToList}
-            className="rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-neutral-950 shadow-lg disabled:opacity-60"
+            className="flex-1 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-neutral-950 shadow-lg disabled:opacity-60"
           >
             {addingToList ? 'Adding…' : `Add ${selectedIds.size} to List`}
           </button>
           <button
             type="button"
             onClick={() => setNaming(true)}
-            className="rounded-full bg-neutral-800 px-5 py-3 text-sm font-semibold text-white shadow-lg"
+            className="flex-1 rounded-full bg-neutral-800 px-5 py-3 text-sm font-semibold text-white shadow-lg"
           >
             Make Deck
           </button>
