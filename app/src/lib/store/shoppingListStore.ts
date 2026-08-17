@@ -157,9 +157,43 @@ async function setChecked(itemKey: string, unitKey: string, checked: boolean): P
   if (error) throw error
 }
 
+// The UI collapses every unit variant of an ingredient into one row (5 cloves
+// + 1 tbsp garlic), so one checkbox can own several stored rows.
+async function setCheckedMany(
+  keys: { itemKey: string; unitKey: string }[],
+  checked: boolean,
+): Promise<void> {
+  await Promise.all(keys.map((k) => setChecked(k.itemKey, k.unitKey, checked)))
+}
+
+// Removes one ingredient outright (all its unit variants). Unlike
+// subtractRecipes this is unconditional — it's the "I don't need this, stop
+// showing it to me" action, not a recalculation, so it deletes rather than
+// decrementing toward zero. Re-adding a recipe that wants the item will bring
+// it back, same as any other add.
+async function removeItem(itemKey: string, unitKeys: string[]): Promise<void> {
+  for (const unitKey of unitKeys) {
+    const { error } = await supabase
+      .from('shopping_list_items')
+      .delete()
+      .eq('item_key', itemKey)
+      .eq('unit_key', unitKey)
+    if (error) throw error
+  }
+}
+
 async function clearAll(): Promise<void> {
   const { error } = await supabase.from('shopping_list_items').delete().not('item_key', 'is', null)
   if (error) throw error
 }
 
-export const shoppingListStore = { getItems, addRecipes, addManualItem, subtractRecipes, setChecked, clearAll }
+export const shoppingListStore = {
+  getItems,
+  addRecipes,
+  addManualItem,
+  subtractRecipes,
+  setChecked,
+  setCheckedMany,
+  removeItem,
+  clearAll,
+}

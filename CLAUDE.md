@@ -171,19 +171,42 @@ thoughtfully — it's what `TESTING.md`'s airplane-mode check verifies.
 
 ## Current state (as of 2026-08-17)
 
-**Google auth + households** shipped in the app code (`scripts/schema-auth.sql`,
-`src/lib/auth.tsx`, `SignInScreen`/`HouseholdOnboardingScreen`, and every store module widened to
-carry `household_id`). **Neither Supabase script has been run against production yet** —
-`schema-auth.sql` then `scripts/reset-to-household-schema.sql` still need to run in the Supabase
-SQL editor, and the Google OAuth provider still needs configuring in the Supabase dashboard +
-Google Cloud Console, per those files' own header comments. `reset-to-household-schema.sql`
-deliberately wipes the nine existing tables' data (recipe priorities/swipes, decks, meal
-calendar, shopping list, imported recipes, photos, tag/recipe overrides) rather than migrating
-Cameron/Mallorie's existing rows onto real accounts — the first household starts fresh through
-normal sign-up instead. Until both scripts run, the old `'Cameron'`/`'Mallorie'` text columns and
-`anon full access` policies are still live in production — don't assume the new schema is
-actually in place there without checking. Deferred follow-ups (household management UI, N-way
-deck-sharing redesign, sign-up abuse consideration) are tracked as `NewIdeas.txt` item 1a–1c.
+**Google auth + households** is fully live: the app code shipped (`src/lib/auth.tsx`,
+`SignInScreen`/`HouseholdOnboardingScreen`, every store module widened to carry `household_id`),
+Google OAuth is configured, and **both Supabase scripts have been run against production** —
+`scripts/schema-auth.sql` then `scripts/reset-to-household-schema.sql`. As designed, that reset
+wiped the nine tables' data (recipe priorities/swipes, decks, meal calendar, shopping list,
+imported recipes, photos, tag/recipe overrides) rather than migrating Cameron/Mallorie's rows —
+the first household was started fresh through normal sign-up. Deferred follow-ups (household
+management UI, N-way deck-sharing redesign, sign-up abuse consideration) are tracked as
+`NewIdeas.txt` item 1a–1c.
+
+Two things had to be repaired after that migration, both worth knowing about:
+- **Auto decks had to be rebuilt.** `truncate table swipe_decks cascade` empties auto decks along
+  with everything else, and nothing restores them automatically — re-run
+  `node --env-file=.env build-swipe-decks.mjs`. `recipe_tags` is *not* in the truncate list, so
+  the source data survives and no re-tagging is needed. Hand-built `source: 'manual'` decks are
+  genuinely unrecoverable.
+- **`recipe_tags` needed its own `authenticated` policy** (`scripts/schema-recipe-tags-auth.sql`).
+  The reset script swaps `anon full access` for a `current_household_id()`-scoped `authenticated`
+  policy on the twelve tables it touches, but `recipe_tags` was never in that list — it's global
+  reference data, correctly not household-scoped, and so was left anon-only with RLS still on.
+  Postgres policies apply per-role and `authenticated` does not inherit `anon`, so the signed-in
+  app silently read back **zero tags** while the table was full. Worth remembering as a general
+  trap: a batch script using the anon key and the signed-in app see different rows, so "the script
+  can read it" is not evidence the app can.
+
+**Shopping list** rows are stored one per `(item_key, unit_key)` as before, but everything above
+that is now a read-layer concern in `app/src/lib/shoppingListMath.ts`: summed quantities render
+as kitchen fractions (rounded *up* — under-buying costs a second trip), unit-less counts round up
+to whole items, compatible units convert within a family (tsp/tbsp/cup, ml/l, oz/lb, g/kg) so one
+ingredient is one row, and items are grouped into store aisles. Pantry staples render in a
+separate collapsed section **with no quantity at all** — "2¼ tsp sea salt" is arithmetically true
+and useless to shop from. Two heuristics drive this: `isPantryStaple` is deliberately
+conservative (a misfiled produce item is a missed purchase), while `classifyAisle` can be broad
+(every aisle renders expanded, so a wrong heading is only cosmetic). Both must cope with the
+extractor leaving packaging and prep words in the item name — `can black beans` is a canned good,
+not dry beans.
 
 **Recipe titles** are repaired at load time in `app/src/lib/recipeTitle.ts`, called once from
 `loadStaticRecipes()` in `lib/data.ts` so search, sorting and deck building all see the cleaned
