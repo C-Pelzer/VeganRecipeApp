@@ -96,7 +96,18 @@ export interface Deck {
 }
 
 /** Pipeline-computed grouping (scripts/tag-recipes.mjs) — see scripts/schema-recipe-tags.sql. */
-export type TagCategory = 'time' | 'cuisine' | 'ingredient' | 'course' | 'book'
+// Must match the CHECK constraints on recipe_tags.category and
+// swipe_decks.category — see scripts/schema-recipe-tags-categories.sql and
+// scripts/schema-swipe-decks-categories.sql.
+export type TagCategory =
+  | 'time'
+  | 'cuisine'
+  | 'ingredient'
+  | 'course'
+  | 'book'
+  | 'diet'
+  | 'effort'
+  | 'season'
 
 export interface RecipeTag {
   recipeId: string

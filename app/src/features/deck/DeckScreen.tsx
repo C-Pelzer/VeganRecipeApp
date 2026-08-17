@@ -165,7 +165,7 @@ export function DeckScreen({ currentUser, onOpenMenu, onViewRecipe }: DeckScreen
           type="button"
           aria-label="Open menu"
           onClick={onOpenMenu}
-          className="text-base leading-none text-white/50"
+          className="-ml-2 flex min-h-11 min-w-11 items-center justify-center text-base leading-none text-white/50"
         >
           ☰
         </button>

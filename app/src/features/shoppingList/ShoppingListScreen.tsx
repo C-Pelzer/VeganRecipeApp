@@ -96,7 +96,7 @@ export function ShoppingListScreen({ onOpenMenu }: ShoppingListScreenProps) {
           type="button"
           aria-label="Open menu"
           onClick={onOpenMenu}
-          className="text-base leading-none text-white/50"
+          className="-ml-2 flex min-h-11 min-w-11 items-center justify-center text-base leading-none text-white/50"
         >
           ☰
         </button>
@@ -117,7 +117,7 @@ export function ShoppingListScreen({ onOpenMenu }: ShoppingListScreenProps) {
           value={newItemText}
           onChange={(e) => setNewItemText(e.target.value)}
           placeholder="Add an item…"
-          className="flex-1 rounded-xl bg-neutral-900 px-3 py-2 text-sm text-white placeholder:text-white/40"
+          className="flex-1 rounded-xl bg-neutral-900 px-3 py-2 text-base text-white placeholder:text-white/40"
         />
         <button
           type="submit"

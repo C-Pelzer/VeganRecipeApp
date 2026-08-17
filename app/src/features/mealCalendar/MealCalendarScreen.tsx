@@ -89,9 +89,16 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
   }, [])
 
   useEffect(() => {
-    mealPlanStore.getEntries().then((planEntries) => {
-      setPlannedIds(new Set(planEntries.map((e) => e.recipeId)))
-    })
+    mealPlanStore
+      .getEntries()
+      .then((planEntries) => {
+        setPlannedIds(new Set(planEntries.map((e) => e.recipeId)))
+      })
+      // mealPlanStore throws on a failed fetch and has no offline fallback, and
+      // plannedIds is part of the loading guard — so without this the calendar
+      // sat on "Loading meal calendar…" forever. The plan list only decides how
+      // the slot picker groups suggestions, so an empty set is a fine fallback.
+      .catch(() => setPlannedIds(new Set()))
   }, [])
 
   useEffect(() => {
@@ -109,9 +116,11 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
     }
   }, [rangeStart, days.length])
 
-  // Runs once the cards actually exist — the loading branch returns before the
-  // scroller is mounted, so this can't be done alongside the data fetches.
-  const ready = Boolean(recipes && entries)
+  // Must mirror the loading guard below exactly. When it only checked recipes
+  // and entries, a slower plannedIds fetch meant this fired while the loading
+  // branch was still rendering, the scroller didn't exist yet, and the carousel
+  // opened on the first day of the window instead of today.
+  const ready = Boolean(recipes && entries && prioritiesByUser && plannedIds)
   useEffect(() => {
     if (ready) scrollToIndex(DAYS_BEFORE, 'auto')
   }, [ready, scrollToIndex])
@@ -201,7 +210,7 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
           type="button"
           aria-label="Open menu"
           onClick={onOpenMenu}
-          className="text-base leading-none text-white/50"
+          className="-ml-2 flex min-h-11 min-w-11 items-center justify-center text-base leading-none text-white/50"
         >
           ☰
         </button>

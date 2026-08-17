@@ -101,7 +101,7 @@ export function CatalogScreen({ currentUser, onOpenMenu, onViewRecipe }: Catalog
           type="button"
           aria-label="Open menu"
           onClick={onOpenMenu}
-          className="text-base leading-none text-white/50"
+          className="-ml-2 flex min-h-11 min-w-11 items-center justify-center text-base leading-none text-white/50"
         >
           ☰
         </button>
@@ -125,7 +125,7 @@ export function CatalogScreen({ currentUser, onOpenMenu, onViewRecipe }: Catalog
           placeholder="Search by title or ingredient…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="min-w-0 flex-1 rounded-xl bg-neutral-900 px-3 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none"
+          className="min-w-0 flex-1 rounded-xl bg-neutral-900 px-3 py-3 text-base text-white placeholder:text-white/40 focus:outline-none"
         />
         <span className="shrink-0 text-xs text-white/50">
           {selecting ? `${selectedIds.size}/${MAX_DECK_SIZE}` : results.length}
@@ -199,7 +199,7 @@ export function CatalogScreen({ currentUser, onOpenMenu, onViewRecipe }: Catalog
               placeholder="e.g. Friday Date Night"
               value={deckLabel}
               onChange={(e) => setDeckLabel(e.target.value)}
-              className="mt-3 w-full rounded-xl bg-neutral-800 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none"
+              className="mt-3 w-full rounded-xl bg-neutral-800 px-3 py-2 text-base text-white placeholder:text-white/40 focus:outline-none"
             />
             {createError && <p className="mt-2 text-xs text-rose-400">{createError}</p>}
             <div className="mt-4 flex justify-end gap-2">

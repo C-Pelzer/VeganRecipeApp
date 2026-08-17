@@ -48,20 +48,25 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
     Promise.all([
       shoppingListStore.addRecipes(selectedRecipes),
       mealPlanStore.addRecipes(selectedRecipes.map((r) => r.id)),
-    ]).then(() => {
-      setSelectedIds(new Set())
-      navigate('/shopping-list')
-    })
+    ])
+      .then(() => {
+        setSelectedIds(new Set())
+        navigate('/shopping-list')
+      })
+      // The button is disabled while this runs, so a rejection without this
+      // left it stuck disabled with no way to retry.
+      .catch(() => setAddingToList(false))
   }
 
   useEffect(() => {
-    Promise.all(HOUSEHOLD_MEMBERS.map((user) => store.getPriorities(user))).then((results) => {
-      const byUser = {} as Record<HouseholdMember, RecipePriority[]>
-      HOUSEHOLD_MEMBERS.forEach((user, i) => {
-        byUser[user] = results[i]
+    Promise.all(HOUSEHOLD_MEMBERS.map((user) => store.getPriorities(user)))
+      .then((results) => {
+        const byUser = {} as Record<HouseholdMember, RecipePriority[]>
+        HOUSEHOLD_MEMBERS.forEach((user, i) => {
+          byUser[user] = results[i]
+        })
+        setPrioritiesByUser(byUser)
       })
-      setPrioritiesByUser(byUser)
-    })
   }, [])
 
   const favoriteIds = useMemo(() => {
@@ -99,7 +104,7 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
           type="button"
           aria-label="Open menu"
           onClick={onOpenMenu}
-          className="text-base leading-none text-white/50"
+          className="-ml-2 flex min-h-11 min-w-11 items-center justify-center text-base leading-none text-white/50"
         >
           ☰
         </button>

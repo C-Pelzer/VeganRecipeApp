@@ -95,7 +95,7 @@ export function AddRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: AddRe
           type="button"
           aria-label="Open menu"
           onClick={onOpenMenu}
-          className="text-base leading-none text-white/50"
+          className="-ml-2 flex min-h-11 min-w-11 items-center justify-center text-base leading-none text-white/50"
         >
           ☰
         </button>
@@ -113,7 +113,7 @@ export function AddRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: AddRe
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Grandma's Lentil Soup"
-            className="w-full rounded-xl bg-neutral-900 px-3 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none"
+            className="w-full rounded-xl bg-neutral-900 px-3 py-3 text-base text-white placeholder:text-white/40 focus:outline-none"
           />
         </div>
 
@@ -125,7 +125,7 @@ export function AddRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: AddRe
               value={servingsText}
               onChange={(e) => setServingsText(e.target.value)}
               placeholder="e.g. 4 servings"
-              className="w-full rounded-xl bg-neutral-900 px-3 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none"
+              className="w-full rounded-xl bg-neutral-900 px-3 py-3 text-base text-white placeholder:text-white/40 focus:outline-none"
             />
           </div>
           <div className="flex-1">
@@ -135,7 +135,7 @@ export function AddRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: AddRe
               value={timeText}
               onChange={(e) => setTimeText(e.target.value)}
               placeholder="e.g. 30 min"
-              className="w-full rounded-xl bg-neutral-900 px-3 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none"
+              className="w-full rounded-xl bg-neutral-900 px-3 py-3 text-base text-white placeholder:text-white/40 focus:outline-none"
             />
           </div>
         </div>
@@ -147,7 +147,7 @@ export function AddRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: AddRe
             onChange={(e) => setHeadnote(e.target.value)}
             placeholder="A quick note about this recipe"
             rows={2}
-            className="w-full rounded-2xl bg-neutral-900 p-3 text-sm text-white placeholder:text-white/40"
+            className="w-full rounded-2xl bg-neutral-900 p-3 text-base text-white placeholder:text-white/40"
           />
         </div>
 
@@ -160,7 +160,7 @@ export function AddRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: AddRe
             onChange={(e) => setIngredientsText(e.target.value)}
             placeholder={'1 cup flour\n2 tbsp olive oil\n1 onion, diced'}
             rows={8}
-            className="w-full rounded-2xl bg-neutral-900 p-3 text-sm text-white placeholder:text-white/40"
+            className="w-full rounded-2xl bg-neutral-900 p-3 text-base text-white placeholder:text-white/40"
           />
         </div>
 
@@ -173,7 +173,7 @@ export function AddRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: AddRe
             onChange={(e) => setStepsText(e.target.value)}
             placeholder={'Heat the oil in a large pot.\nAdd the onion and cook until soft.'}
             rows={8}
-            className="w-full rounded-2xl bg-neutral-900 p-3 text-sm text-white placeholder:text-white/40"
+            className="w-full rounded-2xl bg-neutral-900 p-3 text-base text-white placeholder:text-white/40"
           />
         </div>
 

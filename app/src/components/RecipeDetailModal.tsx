@@ -411,7 +411,7 @@ export function RecipeDetailModal({ recipeId, currentUser, onClose }: RecipeDeta
                       onChange={(e) => setNotesDraft(e.target.value)}
                       placeholder="e.g. we always add extra garlic"
                       rows={3}
-                      className="w-full rounded-2xl bg-neutral-900 p-3 text-sm text-white placeholder:text-white/40"
+                      className="w-full rounded-2xl bg-neutral-900 p-3 text-base text-white placeholder:text-white/40"
                     />
                   </div>
                 ) : (
@@ -462,7 +462,7 @@ export function RecipeDetailModal({ recipeId, currentUser, onClose }: RecipeDeta
                                 if (e.key === 'Enter') addCustomTag(category)
                               }}
                               placeholder={`Add ${(TAG_CATEGORY_LABELS[category] ?? '').toLowerCase()} tag…`}
-                              className="min-w-0 flex-1 rounded-xl bg-neutral-900 px-3 py-1.5 text-xs text-white placeholder:text-white/40 focus:outline-none"
+                              className="min-w-0 flex-1 rounded-xl bg-neutral-900 px-3 py-1.5 text-base text-white placeholder:text-white/40 focus:outline-none"
                             />
                             <button
                               type="button"
@@ -499,7 +499,7 @@ export function RecipeDetailModal({ recipeId, currentUser, onClose }: RecipeDeta
                       onChange={(e) => setIngredientsDraft(e.target.value)}
                       placeholder="One ingredient per line"
                       rows={10}
-                      className="w-full rounded-2xl bg-neutral-900 p-3 text-sm text-white placeholder:text-white/40"
+                      className="w-full rounded-2xl bg-neutral-900 p-3 text-base text-white placeholder:text-white/40"
                     />
                   ) : override?.ingredientsOverride ? (
                     <ul className="space-y-2 rounded-2xl bg-neutral-900 p-4">
@@ -528,7 +528,7 @@ export function RecipeDetailModal({ recipeId, currentUser, onClose }: RecipeDeta
                         onChange={(e) => setStepsDraft(e.target.value)}
                         placeholder="One step per line"
                         rows={10}
-                        className="w-full rounded-2xl bg-neutral-900 p-3 text-sm text-white placeholder:text-white/40"
+                        className="w-full rounded-2xl bg-neutral-900 p-3 text-base text-white placeholder:text-white/40"
                       />
                     ) : (
                       <ol className="space-y-3">

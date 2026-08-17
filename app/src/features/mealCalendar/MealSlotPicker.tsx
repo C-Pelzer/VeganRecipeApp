@@ -145,7 +145,7 @@ export function MealSlotPicker({
                 placeholder="Search favorites…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="rounded-xl bg-neutral-800 px-3 py-2 text-sm placeholder:text-white/40 focus:outline-none"
+                className="rounded-xl bg-neutral-800 px-3 py-2 text-base placeholder:text-white/40 focus:outline-none"
               />
             </div>
 

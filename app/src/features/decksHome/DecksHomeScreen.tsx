@@ -16,6 +16,9 @@ const CATEGORY_LABELS: Record<TagCategory, string> = {
   cuisine: 'Cuisine',
   course: 'Course',
   ingredient: 'Ingredient',
+  diet: 'Diet',
+  effort: 'Effort',
+  season: 'Season & Occasion',
   time: 'Time',
   book: 'Book',
 }
@@ -103,6 +106,8 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
       .listHomeDecks(currentUser)
       .then(setHomeDecks)
       .catch((err) => setError(err instanceof Error ? err : new Error(String(err))))
+    // getPriorities falls back to the local cache rather than rejecting, so
+    // there is nothing here to catch.
     store.getPriorities(currentUser).then((priorities) => {
       setSwipedRecipeIds(new Set(priorities.map((p) => p.recipeId)))
     })
@@ -195,7 +200,7 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
           type="button"
           aria-label="Open menu"
           onClick={onOpenMenu}
-          className="text-base leading-none text-white/50"
+          className="-ml-2 flex min-h-11 min-w-11 items-center justify-center text-base leading-none text-white/50"
         >
           ☰
         </button>
@@ -208,7 +213,7 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
         placeholder="Search decks…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        className="mb-4 rounded-xl bg-neutral-900 px-3 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none"
+        className="mb-4 rounded-xl bg-neutral-900 px-3 py-3 text-base text-white placeholder:text-white/40 focus:outline-none"
       />
 
       <div className="flex-1 space-y-6 overflow-y-auto pb-4">

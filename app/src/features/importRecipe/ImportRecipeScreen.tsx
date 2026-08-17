@@ -95,7 +95,7 @@ export function ImportRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: Im
           type="button"
           aria-label="Open menu"
           onClick={onOpenMenu}
-          className="text-base leading-none text-white/50"
+          className="-ml-2 flex min-h-11 min-w-11 items-center justify-center text-base leading-none text-white/50"
         >
           ☰
         </button>
@@ -114,7 +114,7 @@ export function ImportRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: Im
             placeholder="https://example.com/some-vegan-recipe"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            className="rounded-xl bg-neutral-900 px-3 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none"
+            className="rounded-xl bg-neutral-900 px-3 py-3 text-base text-white placeholder:text-white/40 focus:outline-none"
           />
           <button
             type="button"
