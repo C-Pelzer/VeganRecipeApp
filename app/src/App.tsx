@@ -46,7 +46,7 @@ function App() {
   }
 
   return (
-    <div className="h-full bg-neutral-950">
+    <div className="h-full overflow-hidden bg-neutral-950">
       {currentUser ? (
         <BrowserRouter>
           <NavDrawer

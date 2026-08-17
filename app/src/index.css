@@ -8,11 +8,15 @@ html,
 body,
 #root {
   height: 100%;
-  /* Static 100% tracks the largest possible viewport on mobile, which is
-     taller than what's actually visible once the browser's URL bar/nav
-     buttons are showing — dvh tracks the real visible area instead.
-     Browsers without dvh support ignore this line and keep the 100% above. */
-  height: 100dvh;
+  /* svh, not dvh. dvh tracks the *current* visible height, so it grows and
+     shrinks as the browser's URL bar hides and reveals — which resizes the
+     whole app mid-scroll and leaves the page a little scrollable, with
+     bottom-anchored things (the favorites action button, the last meal card)
+     pushed just under the fold. svh is the height with the browser chrome
+     fully shown, so the layout always fits whatever the toolbar is doing.
+     In the installed PWA there is no URL bar, so svh, dvh and lvh are equal
+     and this costs nothing. Browsers without svh keep the 100% above. */
+  height: 100svh;
   margin: 0;
 }
 

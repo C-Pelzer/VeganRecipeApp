@@ -236,7 +236,7 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
-        className="-mx-4 flex flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden px-[12%] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="-mx-4 flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden px-[12%] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {days.map((day, index) => {
           const isToday = isSameDay(day, new Date())
@@ -257,7 +257,7 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
                 </span>
               </div>
 
-              <div className="flex flex-1 flex-col gap-2">
+              <div className="flex min-h-0 flex-1 flex-col gap-2">
                 {MEAL_TYPES.map((mealType) => {
                   const entry = entryByKey.get(`${toDateKey(day)}|${mealType}`)
                   const recipe = entry ? recipeById.get(entry.recipeId) : undefined
@@ -266,7 +266,7 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
                       key={mealType}
                       type="button"
                       onClick={() => setActiveSlot({ date: day, mealType })}
-                      className="flex flex-1 flex-col rounded-xl bg-neutral-800/70 p-2.5 text-left"
+                      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-neutral-800/70 p-2.5 text-left"
                     >
                       <span className="flex items-center gap-1.5 text-[0.625rem] uppercase tracking-wide text-white/40">
                         {mealType}
