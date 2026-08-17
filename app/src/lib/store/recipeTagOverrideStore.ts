@@ -1,13 +1,14 @@
 import { supabase } from '../supabaseClient'
 import { invalidateTagOverrides } from '../tags'
+import { getCurrentHouseholdId } from '../auth'
 import type { TagCategory } from '../../types/recipe'
 
 async function addTag(recipeId: string, category: TagCategory, tagSlug: string, label: string): Promise<void> {
   const { error } = await supabase
     .from('recipe_tag_overrides')
     .upsert(
-      { recipe_id: recipeId, category, tag_slug: tagSlug, label, action: 'add' },
-      { onConflict: 'recipe_id,category,tag_slug' },
+      { recipe_id: recipeId, category, tag_slug: tagSlug, label, action: 'add', household_id: getCurrentHouseholdId() },
+      { onConflict: 'household_id,recipe_id,category,tag_slug' },
     )
   if (error) throw error
   invalidateTagOverrides()
@@ -17,8 +18,8 @@ async function removeTag(recipeId: string, category: TagCategory, tagSlug: strin
   const { error } = await supabase
     .from('recipe_tag_overrides')
     .upsert(
-      { recipe_id: recipeId, category, tag_slug: tagSlug, label, action: 'remove' },
-      { onConflict: 'recipe_id,category,tag_slug' },
+      { recipe_id: recipeId, category, tag_slug: tagSlug, label, action: 'remove', household_id: getCurrentHouseholdId() },
+      { onConflict: 'household_id,recipe_id,category,tag_slug' },
     )
   if (error) throw error
   invalidateTagOverrides()

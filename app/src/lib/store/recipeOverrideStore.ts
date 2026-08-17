@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient'
+import { getCurrentHouseholdId } from '../auth'
 import type { RecipeOverride } from '../../types/recipe'
 
 interface RecipeOverrideRow {
@@ -42,6 +43,7 @@ async function saveOverride(
     ingredients_override: fields.ingredientsOverride,
     steps_override: fields.stepsOverride,
     updated_at: new Date().toISOString(),
+    household_id: getCurrentHouseholdId(),
   })
   if (error) throw error
 }

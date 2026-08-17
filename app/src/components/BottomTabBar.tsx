@@ -4,7 +4,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { deckStore } from '../lib/store/deckStore'
-import type { HouseholdMember } from '../lib/profile'
 
 // Replaces the drawer as the primary way through the app. The drawer put eight
 // flat destinations behind a ~16px glyph in the top-left corner, so every
@@ -36,7 +35,7 @@ function isActive(tab: Tab, pathname: string): boolean {
 }
 
 interface BottomTabBarProps {
-  currentUser: HouseholdMember
+  currentUser: string
 }
 
 export function BottomTabBar({ currentUser }: BottomTabBarProps) {

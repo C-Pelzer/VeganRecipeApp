@@ -4,10 +4,9 @@ import { CATALOG_SEGMENTS } from '../../components/segments'
 import { invalidateImportedRecipes } from '../../lib/data'
 import { importedRecipeStore } from '../../lib/store/importedRecipeStore'
 import { importRecipeFromHtml, type ImportResult } from '../../lib/recipeImport/mapToRecipe'
-import type { HouseholdMember } from '../../lib/profile'
 
 interface ImportRecipeScreenProps {
-  currentUser: HouseholdMember
+  currentUser: string
   onOpenMenu: () => void
   onViewRecipe: (recipeId: string) => void
 }

@@ -6,10 +6,10 @@ import { generateId } from '../../lib/generateId'
 import { buildManualRecipe } from '../../lib/recipeImport/buildManualRecipe'
 import { importedRecipeStore } from '../../lib/store/importedRecipeStore'
 import { uploadPhoto } from '../../lib/uploadPhoto'
-import type { HouseholdMember } from '../../lib/profile'
+import { useAuth } from '../../lib/auth'
 
 interface AddRecipeScreenProps {
-  currentUser: HouseholdMember
+  currentUser: string
   onOpenMenu: () => void
   onViewRecipe: (recipeId: string) => void
 }
@@ -24,6 +24,7 @@ function splitLines(text: string): string[] {
 }
 
 export function AddRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: AddRecipeScreenProps) {
+  const { profile } = useAuth()
   const [title, setTitle] = useState('')
   const [servingsText, setServingsText] = useState('')
   const [timeText, setTimeText] = useState('')
@@ -60,7 +61,7 @@ export function AddRecipeScreen({ currentUser, onOpenMenu, onViewRecipe }: AddRe
 
       const recipe = buildManualRecipe(id, {
         title: title.trim(),
-        sourceBook: currentUser === 'Cameron' ? "Cameron's Recipes" : "Mallorie's Recipes",
+        sourceBook: `${profile?.displayName || profile?.email || 'My'}'s Recipes`,
         servingsText: servingsText.trim(),
         timeText: timeText.trim(),
         headnote: headnote.trim(),

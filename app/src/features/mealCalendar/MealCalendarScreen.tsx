@@ -6,10 +6,10 @@ import { store } from '../../lib/store/supabaseStore'
 import { mealCalendarStore } from '../../lib/store/mealCalendarStore'
 import { mealPlanStore } from '../../lib/store/mealPlanStore'
 import { favoritedRecipeIds, unionFavoriteIds } from '../../lib/favorites'
-import { HOUSEHOLD_MEMBERS, type HouseholdMember } from '../../lib/profile'
+import { getCurrentHouseholdId, listHouseholdMembers, type Profile } from '../../lib/auth'
 import { addDays, isSameDay, toDateKey } from '../../lib/weekDates'
 import { MealSlotPicker } from './MealSlotPicker'
-import { MEMBER_COLOR } from './memberColor'
+import { memberColor } from './memberColor'
 import type { MealCalendarEntry, MealType, Recipe, RecipePriority } from '../../types/recipe'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner']
@@ -37,10 +37,8 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
   const [focusIndex, setFocusIndex] = useState(DAYS_BEFORE)
   const [entries, setEntries] = useState<MealCalendarEntry[] | null>(null)
   const [entriesError, setEntriesError] = useState<Error | null>(null)
-  const [prioritiesByUser, setPrioritiesByUser] = useState<Record<
-    HouseholdMember,
-    RecipePriority[]
-  > | null>(null)
+  const [members, setMembers] = useState<Profile[] | null>(null)
+  const [prioritiesByUser, setPrioritiesByUser] = useState<Record<string, RecipePriority[]> | null>(null)
   const [activeSlot, setActiveSlot] = useState<SlotSelection | null>(null)
   const [plannedIds, setPlannedIds] = useState<Set<string> | null>(null)
 
@@ -79,12 +77,15 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
   }
 
   useEffect(() => {
-    Promise.all(HOUSEHOLD_MEMBERS.map((user) => store.getPriorities(user))).then((results) => {
-      const byUser = {} as Record<HouseholdMember, RecipePriority[]>
-      HOUSEHOLD_MEMBERS.forEach((user, i) => {
-        byUser[user] = results[i]
+    listHouseholdMembers(getCurrentHouseholdId()).then((householdMembers) => {
+      setMembers(householdMembers)
+      Promise.all(householdMembers.map((m) => store.getPriorities(m.id))).then((results) => {
+        const byUser: Record<string, RecipePriority[]> = {}
+        householdMembers.forEach((m, i) => {
+          byUser[m.id] = results[i]
+        })
+        setPrioritiesByUser(byUser)
       })
-      setPrioritiesByUser(byUser)
     })
   }, [])
 
@@ -120,17 +121,16 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
   // and entries, a slower plannedIds fetch meant this fired while the loading
   // branch was still rendering, the scroller didn't exist yet, and the carousel
   // opened on the first day of the window instead of today.
-  const ready = Boolean(recipes && entries && prioritiesByUser && plannedIds)
+  const ready = Boolean(recipes && entries && members && prioritiesByUser && plannedIds)
   useEffect(() => {
     if (ready) scrollToIndex(DAYS_BEFORE, 'auto')
   }, [ready, scrollToIndex])
 
   const favoriteRecipes = useMemo<Recipe[]>(() => {
-    if (!recipes || !prioritiesByUser) return []
-    const [a, b] = HOUSEHOLD_MEMBERS.map((user) => favoritedRecipeIds(prioritiesByUser[user] ?? []))
-    const favoriteIds = unionFavoriteIds(a, b)
+    if (!recipes || !members || !prioritiesByUser) return []
+    const favoriteIds = unionFavoriteIds(members.map((m) => favoritedRecipeIds(prioritiesByUser[m.id] ?? [])))
     return recipes.filter((r) => favoriteIds.has(r.id))
-  }, [recipes, prioritiesByUser])
+  }, [recipes, members, prioritiesByUser])
 
   // The slot picker shows these as two sections, Meal Plan first — planned
   // recipes come from the full recipe pool (not just favorites) since
@@ -159,7 +159,12 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
     return map
   }, [recipes])
 
-  function handleSave(recipeId: string, assignedTo: HouseholdMember) {
+  const memberNameById = useMemo(
+    () => new Map((members ?? []).map((m) => [m.id, m.displayName || m.email])),
+    [members],
+  )
+
+  function handleSave(recipeId: string, assignedTo: string) {
     if (!activeSlot) return
     const entryDate = toDateKey(activeSlot.date)
     const mealType = activeSlot.mealType
@@ -191,7 +196,7 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
     )
   }
 
-  if (!recipes || !entries || !prioritiesByUser || !plannedIds) {
+  if (!recipes || !entries || !members || !prioritiesByUser || !plannedIds) {
     return (
       <div className="flex h-full items-center justify-center text-white/50">
         Loading meal calendar…
@@ -272,8 +277,8 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
                         {mealType}
                         {entry && (
                           <span
-                            aria-label={`Assigned to ${entry.assignedTo}`}
-                            className={`h-1.5 w-1.5 rounded-full ${MEMBER_COLOR[entry.assignedTo]}`}
+                            aria-label={`Assigned to ${memberNameById.get(entry.assignedTo) ?? 'a household member'}`}
+                            className={`h-1.5 w-1.5 rounded-full ${memberColor(entry.assignedTo)}`}
                           />
                         )}
                       </span>
@@ -307,6 +312,7 @@ export function MealCalendarScreen({ onOpenMenu, onViewRecipe }: MealCalendarScr
           isOpen={true}
           date={activeSlot.date}
           mealType={activeSlot.mealType}
+          members={members}
           plannedRecipes={plannedRecipes}
           favoriteRecipes={otherFavoriteRecipes}
           initialEntry={activeEntry}

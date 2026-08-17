@@ -4,11 +4,11 @@ import { useRecipes } from '../../lib/data'
 import { deckStore, type HomeDecks } from '../../lib/store/deckStore'
 import { store } from '../../lib/store/supabaseStore'
 import { DECKS } from '../deck/decks'
-import { HOUSEHOLD_MEMBERS, type HouseholdMember } from '../../lib/profile'
+import { getCurrentHouseholdId, listHouseholdMembers, type Profile } from '../../lib/auth'
 import type { Recipe, SwipeDeckSummary, TagCategory } from '../../types/recipe'
 
 interface DecksHomeScreenProps {
-  currentUser: HouseholdMember
+  currentUser: string
   onOpenMenu: () => void
 }
 
@@ -95,11 +95,10 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
   const [actionSheetDeck, setActionSheetDeck] = useState<SwipeDeckSummary | null>(null)
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
+  const [members, setMembers] = useState<Profile[]>([])
 
-  const otherMember = useMemo(
-    () => HOUSEHOLD_MEMBERS.find((m) => m !== currentUser) as HouseholdMember,
-    [currentUser],
-  )
+  const otherMembers = useMemo(() => members.filter((m) => m.id !== currentUser), [members, currentUser])
+  const memberNameById = useMemo(() => new Map(members.map((m) => [m.id, m.displayName || m.email])), [members])
 
   useEffect(() => {
     deckStore
@@ -111,6 +110,11 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
     store.getPriorities(currentUser).then((priorities) => {
       setSwipedRecipeIds(new Set(priorities.map((p) => p.recipeId)))
     })
+    listHouseholdMembers(getCurrentHouseholdId())
+      .then(setMembers)
+      .catch(() => {
+        // Sending decks just won't be offered if this fails — not fatal.
+      })
   }, [currentUser])
 
   // A deck counts as "swiped through" once every recipe in it has been
@@ -151,12 +155,12 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
     setSendError(null)
   }
 
-  function handleSend() {
+  function handleSend(sharedWith: string) {
     if (!actionSheetDeck) return
     setSending(true)
     setSendError(null)
     deckStore
-      .shareDeck(actionSheetDeck.id, currentUser, otherMember)
+      .shareDeck(actionSheetDeck.id, currentUser, sharedWith)
       .then(() => setActionSheetDeck(null))
       .catch((err) => setSendError(err instanceof Error ? err.message : 'Something went wrong.'))
       .finally(() => setSending(false))
@@ -245,7 +249,9 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
                     key={deck.id}
                     label={deck.label}
                     images={pickPreviewImages(recipeIds, recipesById)}
-                    subtitle={share ? `from ${share.sharedBy}` : `${recipeIds.length} recipes`}
+                    subtitle={
+                      share ? `from ${memberNameById.get(share.sharedBy) ?? 'a household member'}` : `${recipeIds.length} recipes`
+                    }
                     unseen={!!share && !share.seenAt}
                     onTap={() => openActionSheet(deck, share)}
                   />
@@ -300,14 +306,17 @@ export function DecksHomeScreen({ currentUser, onOpenMenu }: DecksHomeScreenProp
               >
                 Swipe this deck
               </button>
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={sending}
-                className="rounded-full bg-neutral-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {sending ? 'Sending…' : `Send to ${otherMember}`}
-              </button>
+              {otherMembers.map((member) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  onClick={() => handleSend(member.id)}
+                  disabled={sending}
+                  className="rounded-full bg-neutral-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {sending ? 'Sending…' : `Send to ${member.displayName || member.email}`}
+                </button>
+              ))}
               <button
                 type="button"
                 onClick={closeActionSheet}

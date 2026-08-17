@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useRecipes } from '../lib/data'
-import type { HouseholdMember } from '../lib/profile'
 import { recipeOverrideStore } from '../lib/store/recipeOverrideStore'
 import { recipePhotoStore } from '../lib/store/recipePhotoStore'
 import { recipeTagOverrideStore } from '../lib/store/recipeTagOverrideStore'
@@ -82,7 +81,7 @@ function IngredientGroupBlock({ group }: { group: IngredientGroup }) {
 
 interface RecipeDetailModalProps {
   recipeId: string | null
-  currentUser: HouseholdMember
+  currentUser: string
   onClose: () => void
 }
 

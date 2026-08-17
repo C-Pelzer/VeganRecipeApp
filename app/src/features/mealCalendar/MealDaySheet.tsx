@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { MEMBER_COLOR } from './memberColor'
+import { memberColor } from './memberColor'
 import type { MealCalendarEntry, MealType, Recipe } from '../../types/recipe'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner']
@@ -73,7 +73,7 @@ export function MealDaySheet({ isOpen, date, entries, recipeById, onSelectMeal, 
                     {entry && (
                       <span
                         aria-label={`Assigned to ${entry.assignedTo}`}
-                        className={`h-3 w-3 shrink-0 rounded-full ${MEMBER_COLOR[entry.assignedTo]}`}
+                        className={`h-3 w-3 shrink-0 rounded-full ${memberColor(entry.assignedTo)}`}
                       />
                     )}
                   </button>

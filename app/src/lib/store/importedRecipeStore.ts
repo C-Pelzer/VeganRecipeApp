@@ -1,11 +1,11 @@
 import { supabase } from '../supabaseClient'
-import type { HouseholdMember } from '../profile'
+import { getCurrentHouseholdId } from '../auth'
 import type { Recipe } from '../../types/recipe'
 
 interface ImportedRecipeRow {
   id: string
   source_url: string
-  added_by: HouseholdMember
+  added_by: string
   recipe_data: Recipe
   created_at: string
 }
@@ -40,10 +40,14 @@ async function getAll(): Promise<Recipe[]> {
   return ((data ?? []) as ImportedRecipeRow[]).map((row) => row.recipe_data)
 }
 
-async function add(recipe: Recipe, sourceUrl: string, addedBy: HouseholdMember): Promise<void> {
-  const { error } = await supabase
-    .from('imported_recipes')
-    .insert({ id: recipe.id, source_url: sourceUrl, added_by: addedBy, recipe_data: recipe })
+async function add(recipe: Recipe, sourceUrl: string, addedBy: string): Promise<void> {
+  const { error } = await supabase.from('imported_recipes').insert({
+    id: recipe.id,
+    source_url: sourceUrl,
+    added_by: addedBy,
+    recipe_data: recipe,
+    household_id: getCurrentHouseholdId(),
+  })
   if (error) throw error
 }
 

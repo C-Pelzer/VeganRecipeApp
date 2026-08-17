@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { HOUSEHOLD_MEMBERS, type HouseholdMember } from '../../lib/profile'
+import type { Profile } from '../../lib/auth'
 import type { MealCalendarEntry, MealType, Recipe } from '../../types/recipe'
 
 const MEAL_TYPE_LABELS: Record<MealType, string> = {
@@ -13,12 +13,13 @@ interface MealSlotPickerProps {
   isOpen: boolean
   date: Date
   mealType: MealType
+  members: Profile[]
   /** Shown first, its own section — recipes already on the meal plan. */
   plannedRecipes: Recipe[]
   /** Shown after Meal Plan — every other favorite (caller excludes anything already in plannedRecipes). */
   favoriteRecipes: Recipe[]
   initialEntry: MealCalendarEntry | null
-  onSave: (recipeId: string, assignedTo: HouseholdMember) => void
+  onSave: (recipeId: string, assignedTo: string) => void
   onClear: () => void
   onClose: () => void
   onViewRecipe: (recipeId: string) => void
@@ -28,6 +29,7 @@ export function MealSlotPicker({
   isOpen,
   date,
   mealType,
+  members,
   plannedRecipes,
   favoriteRecipes,
   initialEntry,
@@ -38,15 +40,15 @@ export function MealSlotPicker({
 }: MealSlotPickerProps) {
   const [search, setSearch] = useState('')
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null)
-  const [assignedTo, setAssignedTo] = useState<HouseholdMember>(HOUSEHOLD_MEMBERS[0])
+  const [assignedTo, setAssignedTo] = useState<string>(members[0]?.id ?? '')
 
   useEffect(() => {
     if (isOpen) {
       setSelectedRecipeId(initialEntry?.recipeId ?? null)
-      setAssignedTo(initialEntry?.assignedTo ?? HOUSEHOLD_MEMBERS[0])
+      setAssignedTo(initialEntry?.assignedTo ?? members[0]?.id ?? '')
       setSearch('')
     }
-  }, [isOpen, initialEntry])
+  }, [isOpen, initialEntry, members])
 
   function matchesSearch(recipe: Recipe): boolean {
     const query = search.trim().toLowerCase()
@@ -126,16 +128,16 @@ export function MealSlotPicker({
 
             <div className="flex flex-col gap-3 p-4">
               <div className="flex gap-1 rounded-full bg-neutral-800 p-1">
-                {HOUSEHOLD_MEMBERS.map((member) => (
+                {members.map((member) => (
                   <button
-                    key={member}
+                    key={member.id}
                     type="button"
-                    onClick={() => setAssignedTo(member)}
+                    onClick={() => setAssignedTo(member.id)}
                     className={`flex-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                      assignedTo === member ? 'bg-emerald-500 text-neutral-950' : 'text-white/60'
+                      assignedTo === member.id ? 'bg-emerald-500 text-neutral-950' : 'text-white/60'
                     }`}
                   >
-                    {member}
+                    {member.displayName || member.email}
                   </button>
                 ))}
               </div>

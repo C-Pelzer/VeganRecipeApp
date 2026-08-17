@@ -1,7 +1,7 @@
 import { supabase } from '../supabaseClient'
 import { fetchAllRows } from '../fetchAllRows'
 import { generateId } from '../generateId'
-import type { HouseholdMember } from '../profile'
+import { getCurrentHouseholdId } from '../auth'
 import type { SwipeDeckShare, SwipeDeckSummary, TagCategory } from '../../types/recipe'
 
 const MAX_DECK_SIZE = 40
@@ -12,14 +12,14 @@ interface SwipeDeckRow {
   source: 'auto' | 'manual'
   category: TagCategory | null
   tag_slug: string | null
-  created_by: HouseholdMember | 'system'
+  created_by: string | null
   created_at: string
 }
 
 interface SwipeDeckShareRow {
   deck_id: string
-  shared_with: HouseholdMember
-  shared_by: HouseholdMember
+  shared_with: string
+  shared_by: string
   shared_at: string
   seen_at: string | null
 }
@@ -60,7 +60,7 @@ export interface MyDeck {
 }
 
 /** Decks a household member created, plus decks explicitly shared with them. */
-async function listMyDecks(currentUser: HouseholdMember): Promise<MyDeck[]> {
+async function listMyDecks(currentUser: string): Promise<MyDeck[]> {
   const [{ data: ownedRows, error: ownedError }, { data: shareRows, error: shareError }] = await Promise.all([
     supabase.from('swipe_decks').select('*').eq('source', 'manual').eq('created_by', currentUser),
     supabase.from('swipe_deck_shares').select('*').eq('shared_with', currentUser),
@@ -100,7 +100,7 @@ export interface HomeDecks {
  * exceed Supabase's default 1000-row-per-request cap, so this pages through
  * with fetchAllRows rather than a bare .select().
  */
-async function listHomeDecks(currentUser: HouseholdMember): Promise<HomeDecks> {
+async function listHomeDecks(currentUser: string): Promise<HomeDecks> {
   const [myDecks, categoryDecks] = await Promise.all([listMyDecks(currentUser), listCategoryDecks()])
 
   const deckIds = [...myDecks.map((d) => d.deck.id), ...categoryDecks.map((d) => d.id)]
@@ -125,7 +125,7 @@ async function listHomeDecks(currentUser: HouseholdMember): Promise<HomeDecks> {
 }
 
 /** Lightweight count for the NavDrawer "Decks" link's badge — avoids loading full deck rows. */
-async function getUnseenShareCount(currentUser: HouseholdMember): Promise<number> {
+async function getUnseenShareCount(currentUser: string): Promise<number> {
   const { count, error } = await supabase
     .from('swipe_deck_shares')
     .select('*', { count: 'exact', head: true })
@@ -157,17 +157,19 @@ async function getDeck(deckId: string): Promise<{ deck: SwipeDeckSummary; recipe
   }
 }
 
-async function createDeck(
-  label: string,
-  recipeIds: string[],
-  createdBy: HouseholdMember,
-): Promise<SwipeDeckSummary> {
+async function createDeck(label: string, recipeIds: string[], createdBy: string): Promise<SwipeDeckSummary> {
   const id = generateId()
   const cappedIds = recipeIds.slice(0, MAX_DECK_SIZE)
 
-  const { error: deckError } = await supabase
-    .from('swipe_decks')
-    .insert({ id, label, source: 'manual', category: null, tag_slug: null, created_by: createdBy })
+  const { error: deckError } = await supabase.from('swipe_decks').insert({
+    id,
+    label,
+    source: 'manual',
+    category: null,
+    tag_slug: null,
+    created_by: createdBy,
+    household_id: getCurrentHouseholdId(),
+  })
   if (deckError) throw deckError
 
   const { error: recipesError } = await supabase
@@ -186,7 +188,7 @@ async function createDeck(
   }
 }
 
-async function shareDeck(deckId: string, sharedBy: HouseholdMember, sharedWith: HouseholdMember): Promise<void> {
+async function shareDeck(deckId: string, sharedBy: string, sharedWith: string): Promise<void> {
   const { error } = await supabase
     .from('swipe_deck_shares')
     .upsert(
@@ -196,7 +198,7 @@ async function shareDeck(deckId: string, sharedBy: HouseholdMember, sharedWith: 
   if (error) throw error
 }
 
-async function markSeen(deckId: string, userId: HouseholdMember): Promise<void> {
+async function markSeen(deckId: string, userId: string): Promise<void> {
   const { error } = await supabase
     .from('swipe_deck_shares')
     .update({ seen_at: new Date().toISOString() })

@@ -5,13 +5,12 @@ import { useNavigate } from 'react-router-dom'
 import { useRecipes } from '../../lib/data'
 import { deckStore } from '../../lib/store/deckStore'
 import { provenanceLabel } from '../../lib/recipeProvenance'
-import type { HouseholdMember } from '../../lib/profile'
 import type { Recipe } from '../../types/recipe'
 
 const MAX_DECK_SIZE = 40
 
 interface CatalogScreenProps {
-  currentUser: HouseholdMember
+  currentUser: string
   onOpenMenu: () => void
   onViewRecipe: (recipeId: string) => void
 }

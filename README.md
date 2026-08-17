@@ -1,12 +1,15 @@
 # Vegan Recipe Swipe App
 
-A private, two-person meal-planning app. Recipes are extracted from a personal library of
-vegan cookbooks; the interaction model is Tinder-style — swipe through recipe cards, and when
-**both** people swipe right, the recipe becomes a match and lands in the week's meal plan.
+Started as a private, two-person meal-planning app and is now open to friends and family —
+anyone signs in with Google and creates or joins a household. Recipes are extracted from a
+personal library of vegan cookbooks; the interaction model is Tinder-style — swipe through recipe
+cards, and when everyone in a household swipes right, the recipe becomes a match and lands in the
+week's meal plan.
 
 > **This repo is private and must stay that way.** The recipe text and images are the source
-> cookbooks' copyrighted content. Don't publish this repo, deploy the app somewhere publicly
-> accessible, or distribute the extracted content beyond the two household members it's for.
+> cookbooks' copyrighted content — don't publish this repo or redistribute the extracted content.
+> The *deployed app* is a different story: anyone can now sign in and create their own household,
+> which only sees its own data (see `CLAUDE.md`'s Architecture section).
 
 ## Status
 
@@ -63,9 +66,9 @@ app/                               The React PWA
     types/recipe.ts                 TS types mirroring the documented schema
     lib/store/                      SyncStore interface + Supabase-backed implementation
     lib/data.ts                     fetches/caches the recipe bundle
-    lib/profile.ts                  "who's swiping" device picker (not auth)
+    lib/auth.tsx                    Supabase Auth (Google) + household context
     features/deck/                  swipe card stack + drag gestures
-    features/profile/               profile picker screen
+    features/auth/                  sign-in + household create/join screens
   public/data/recipes.json          generated: the bundle the app fetches
   public/images/recipes/*.jpg       generated: per-recipe hero photos
   TESTING.md                        full manual test walkthrough (desktop + phone)
@@ -99,8 +102,8 @@ See `app/TESTING.md` for a full walkthrough (desktop smoke test, phone install, 
   actually syncs, via Supabase. Writes land locally first so swiping never blocks on network;
   a failed sync queues and retries on the next network-touching call, so a swipe made offline
   in the kitchen isn't lost.
-- There's no login — a one-tap "which of us is this" picker on first load remembers the
-  choice per device (see brief: no auth flows for a two-person household tool).
+- Real login via Supabase Auth (Google OAuth) — each household's data is scoped to that
+  household via Postgres RLS, not a device-local picker (see `CLAUDE.md`'s Architecture section).
 
 ## Roadmap
 

@@ -9,7 +9,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { provenanceLabel } from '../../lib/recipeProvenance'
 import { favoritedRecipeIds, sharedFavoriteIds } from '../../lib/favorites'
  import { effectiveTagsByRecipe, useRecipeTagOverrides, useRecipeTags } from '../../lib/tags'
-import { HOUSEHOLD_MEMBERS, type HouseholdMember } from '../../lib/profile'
+import { getCurrentHouseholdId, listHouseholdMembers } from '../../lib/auth'
 import type { Recipe, RecipePriority, TagCategory } from '../../types/recipe'
 
 type Tab = 'yours' | 'shared'
@@ -32,7 +32,7 @@ const MAX_CHIPS = 12
 const MAX_DECK_SIZE = 40
 
 interface FavoritesScreenProps {
-  currentUser: HouseholdMember
+  currentUser: string
   onOpenMenu: () => void
   onViewRecipe: (recipeId: string) => void
 }
@@ -40,10 +40,8 @@ interface FavoritesScreenProps {
 export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: FavoritesScreenProps) {
   const navigate = useNavigate()
   const { recipes, error } = useRecipes()
-  const [prioritiesByUser, setPrioritiesByUser] = useState<Record<
-    HouseholdMember,
-    RecipePriority[]
-  > | null>(null)
+  const [memberIds, setMemberIds] = useState<string[] | null>(null)
+  const [prioritiesByUser, setPrioritiesByUser] = useState<Record<string, RecipePriority[]> | null>(null)
   const [tab, setTab] = useState<Tab>('yours')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [addingToList, setAddingToList] = useState(false)
@@ -135,22 +133,24 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
   }
 
   useEffect(() => {
-    Promise.all(HOUSEHOLD_MEMBERS.map((user) => store.getPriorities(user)))
-      .then((results) => {
-        const byUser = {} as Record<HouseholdMember, RecipePriority[]>
-        HOUSEHOLD_MEMBERS.forEach((user, i) => {
+    listHouseholdMembers(getCurrentHouseholdId()).then((members) => {
+      const ids = members.map((m) => m.id)
+      setMemberIds(ids)
+      Promise.all(ids.map((user) => store.getPriorities(user))).then((results) => {
+        const byUser: Record<string, RecipePriority[]> = {}
+        ids.forEach((user, i) => {
           byUser[user] = results[i]
         })
         setPrioritiesByUser(byUser)
       })
+    })
   }, [])
 
   const favoriteIds = useMemo(() => {
-    if (!prioritiesByUser) return new Set<string>()
+    if (!prioritiesByUser || !memberIds) return new Set<string>()
     if (tab === 'yours') return favoritedRecipeIds(prioritiesByUser[currentUser] ?? [])
-    const [a, b] = HOUSEHOLD_MEMBERS.map((user) => favoritedRecipeIds(prioritiesByUser[user] ?? []))
-    return sharedFavoriteIds(a, b)
-  }, [prioritiesByUser, tab, currentUser])
+    return sharedFavoriteIds(memberIds.map((user) => favoritedRecipeIds(prioritiesByUser[user] ?? [])))
+  }, [prioritiesByUser, memberIds, tab, currentUser])
 
   const tagsByRecipe = useMemo(
     () => effectiveTagsByRecipe(tags ?? [], overrides ?? []),
@@ -201,14 +201,10 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
     const byRecent = (a: Recipe, b: Recipe) => (swipedAt.get(b.id) ?? '').localeCompare(swipedAt.get(a.id) ?? '')
 
     if (sort === 'shared-first') {
-      const bothIds = prioritiesByUser
-        ? sharedFavoriteIds(
-            ...(HOUSEHOLD_MEMBERS.map((user) => favoritedRecipeIds(prioritiesByUser[user] ?? [])) as [
-              Set<string>,
-              Set<string>,
-            ]),
-          )
-        : new Set<string>()
+      const bothIds =
+        prioritiesByUser && memberIds
+          ? sharedFavoriteIds(memberIds.map((user) => favoritedRecipeIds(prioritiesByUser[user] ?? [])))
+          : new Set<string>()
       sorted.sort((a, b) => {
         const diff = Number(bothIds.has(b.id)) - Number(bothIds.has(a.id))
         return diff !== 0 ? diff : byRecent(a, b)
@@ -218,7 +214,7 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
 
     sorted.sort(byRecent)
     return sorted
-  }, [matchingRecipes, sort, prioritiesByUser, currentUser])
+  }, [matchingRecipes, sort, prioritiesByUser, memberIds, currentUser])
 
   if (error) {
     return (
@@ -343,7 +339,7 @@ export function FavoritesScreen({ currentUser, onOpenMenu, onViewRecipe }: Favor
             <p>
               {tab === 'yours'
                 ? 'Nothing favorited yet — swipe right on something good.'
-                : "Nothing you've both favorited yet."}
+                : "Nothing everyone in the household has favorited yet."}
             </p>
           )}
         </div>

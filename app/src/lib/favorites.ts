@@ -10,17 +10,21 @@ export function favoritedRecipeIds(priorities: RecipePriority[]): Set<string> {
 }
 
 /** NewIdeas.txt item 8: "the group favorites list is the inner join" — live,
- * not persisted, so it tracks both people's current favorites exactly. */
-export function sharedFavoriteIds(a: Set<string>, b: Set<string>): Set<string> {
+ * not persisted, so it tracks every current household member's favorites
+ * exactly. A household of one has nothing to intersect against, so that case
+ * just returns their own favorites rather than an empty set. */
+export function sharedFavoriteIds(sets: Set<string>[]): Set<string> {
+  if (sets.length === 0) return new Set()
+  const [first, ...rest] = sets
   const shared = new Set<string>()
-  for (const id of a) {
-    if (b.has(id)) shared.add(id)
+  for (const id of first) {
+    if (rest.every((s) => s.has(id))) shared.add(id)
   }
   return shared
 }
 
-/** Either person's favorite counts — used where the picker should offer the
- * whole household's pool (e.g. the meal calendar), not just one person's. */
-export function unionFavoriteIds(a: Set<string>, b: Set<string>): Set<string> {
-  return new Set([...a, ...b])
+/** Any household member's favorite counts — used where the picker should offer
+ * the whole household's pool (e.g. the meal calendar), not just one person's. */
+export function unionFavoriteIds(sets: Set<string>[]): Set<string> {
+  return new Set(sets.flatMap((s) => [...s]))
 }

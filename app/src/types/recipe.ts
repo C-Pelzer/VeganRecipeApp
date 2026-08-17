@@ -1,8 +1,6 @@
 // Mirrors the schema documented in CLAUDE_CODE_BRIEF.md. Keep in sync with
 // scripts/build-bundle.mjs, which is the only thing that produces this shape.
 
-import type { HouseholdMember } from '../lib/profile'
-
 export type GramsSource =
   | 'book'
   | 'book-package'
@@ -141,15 +139,16 @@ export interface SwipeDeckSummary {
   source: 'auto' | 'manual'
   category: TagCategory | null
   tagSlug: string | null
-  createdBy: HouseholdMember | 'system'
+  /** Profile id, or null for an auto deck (no human creator). */
+  createdBy: string | null
   createdAt: string
 }
 
-/** An explicit "send this deck to the other household member" record. */
+/** An explicit "send this deck to another household member" record. */
 export interface SwipeDeckShare {
   deckId: string
-  sharedWith: HouseholdMember
-  sharedBy: HouseholdMember
+  sharedWith: string
+  sharedBy: string
   sharedAt: string
   seenAt: string | null
 }
@@ -191,7 +190,7 @@ export interface RecipePhoto {
   id: string
   recipeId: string
   photoUrl: string
-  addedBy: HouseholdMember
+  addedBy: string
   addedAt: string
 }
 
@@ -202,6 +201,6 @@ export interface MealCalendarEntry {
   entryDate: string // YYYY-MM-DD
   mealType: MealType
   recipeId: string
-  assignedTo: HouseholdMember
+  assignedTo: string
   updatedAt: string
 }

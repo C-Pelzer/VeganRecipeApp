@@ -4,13 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A **private** two-person household app (Cameron and Mallorie). Recipes are extracted from a
-personal library of copyrighted vegan cookbooks (EPUB) — this repo, its data, and its deployed
-app must never be made public or shared beyond those two people. Not a commercial product: don't
-add auth flows, onboarding, analytics, or subscription scaffolding. See `README.md` and
-`CLAUDE_CODE_BRIEF.md` for the full product brief, data schema, and original build order —
-`CLAUDE_CODE_BRIEF.md`'s "Roadmap"/"Build order" sections are historical; the actual feature set
-has grown well past them (see Architecture below).
+Started as a private two-person household app (Cameron and Mallorie) and is now opening up to
+friends and family: anyone can sign in with their own Google account and create or join a
+household. Recipes are extracted from a personal library of copyrighted vegan cookbooks (EPUB) —
+the recipe corpus itself is still not for redistribution, but the deployed app is no longer
+limited to two named people. Not a commercial product: no payment, subscriptions, or analytics —
+sign-in exists to give each household its own private data, not to monetize or track anyone. See
+`README.md` and `CLAUDE_CODE_BRIEF.md` for the full product brief, data schema, and original build
+order — `CLAUDE_CODE_BRIEF.md`'s "Roadmap"/"Build order" sections are historical; the actual
+feature set has grown well past them (see Architecture below).
 
 ## Repo layout — three pipelines feeding one app
 
@@ -68,9 +70,23 @@ comment in `wrangler.jsonc`).
 ## Architecture
 
 **State split**: recipes are read-only static data (`app/public/data/recipes.json`, generated,
-never written back to); everything that needs two writers syncs through Supabase. There's no
-login — `src/lib/profile.ts` is a one-tap "which of us is this" device picker (Cameron/Mallorie),
-not auth.
+never written back to); everything else syncs through Supabase, scoped per household.
+
+**Auth & households**: real Supabase Auth via Google OAuth (`src/lib/auth.tsx` — `AuthProvider`/
+`useAuth()`, plus `getCurrentHouseholdId()`/`getCurrentProfile()` ambient accessors for store
+modules, which aren't React components). A `profiles` row is auto-provisioned per Google account
+(trigger in `scripts/schema-auth.sql`); a `households` row groups any number of profiles, joined
+via a shared invite code (`create_household`/`join_household` RPCs). `App.tsx` gates on session →
+household in that order: signed out shows `SignInScreen`, signed in with no household shows
+`HouseholdOnboardingScreen`, otherwise the app renders normally with `currentUser` now meaning "my
+`profiles.id`" rather than a literal `'Cameron'`/`'Mallorie'` string. Every synced table's RLS is
+scoped to `household_id = current_household_id()` (see `scripts/reset-to-household-schema.sql`,
+which wipes the pre-household-auth data on the nine existing tables rather than migrating it —
+a deliberate choice to start the first household fresh via normal sign-up) — a new table follows
+the same pattern:
+add `household_id uuid not null references households (id)`, scope its RLS policy through
+`current_household_id()`, and if it has any natural/composite primary key, make sure `household_id`
+is part of it (two households must never collide on the same key).
 
 **Store pattern**: each synced feature has its own store module under `src/lib/store/`
 (`deckStore.ts`, `mealCalendarStore.ts`, `mealPlanStore.ts`, `shoppingListStore.ts`,
@@ -92,10 +108,12 @@ mutate `recipes.json` itself:
   (user add/remove edits) — merged client-side in `src/lib/tags.ts`
   (`effectiveTagsByRecipe`), mirroring the same merge `build-swipe-decks.mjs` does server-side.
 - `swipe_decks` / `swipe_deck_recipes` / `swipe_deck_shares` — persisted decks, capped at 40
-  recipes each. `source: 'auto'` decks are one per tag (rebuilt by
-  `build-swipe-decks.mjs`); `source: 'manual'` decks are hand-built in the Catalog and can be
-  shared to the other household member. `'new'`/`'everything'` (`src/features/deck/decks.ts`)
-  are the only two decks that stay live pool filters rather than persisted rows.
+  recipes each. `source: 'auto'` decks are one per tag (rebuilt by `build-swipe-decks.mjs`,
+  global — readable by every signed-in user, not household-scoped, since they're derived from the
+  shared recipe pool); `source: 'manual'` decks are household-owned and hand-built in the Catalog,
+  and can be shared to any other member of the same household. `'new'`/`'everything'`
+  (`src/features/deck/decks.ts`) are the only two decks that stay live pool filters rather than
+  persisted rows.
 - `recipe_overrides`, `recipe_photos`, `imported_recipes`, `meal_plan_items`,
   `meal_calendar_entries`, `shopping_list_items` — one Supabase table each, self-explanatory from
   their store module. Schema for every table lives in `scripts/schema-*.sql`.
@@ -123,10 +141,12 @@ thoughtfully — it's what `TESTING.md`'s airplane-mode check verifies.
 - **No `supabase/migrations` or linked CLI** — schema changes are applied by hand. When a task
   needs a new table, write `scripts/schema-<name>.sql` matching the existing tables' conventions
   (plain `text` columns, composite primary keys over surrogate ids when a row is naturally unique
-  by its data, one permissive `create policy "anon full access" ... for all to anon using (true)
-  with check (true)` per table, `not null default ''` / `default now()` over nullable columns),
-  hand it to Cameron to run in the Supabase SQL editor, and wait for his confirmation before
-  writing or reading any data through it — the anon key used everywhere can't run DDL anyway.
+  by its data, `not null default ''` / `default now()` over nullable columns), hand it to Cameron
+  to run in the Supabase SQL editor, and wait for his confirmation before writing or reading any
+  data through it. Since the household-auth migration, new tables are `household_id`-scoped and
+  RLS-restricted to `authenticated` via `current_household_id()` (see Architecture above), not the
+  old blanket `anon full access` policy — that pattern only survives on the `auto`-source rows of
+  `swipe_decks`, which are genuinely global reference data.
 - **No staging Supabase project** — it's the one real database the household actually uses.
   Any manual/Playwright verification that swipes, favorites, checks a shopping-list box, or adds
   a recipe writes real data. Prefer verification paths that don't require real writes when
@@ -149,7 +169,21 @@ thoughtfully — it's what `TESTING.md`'s airplane-mode check verifies.
   auth. The one exception is `supabase/functions/fetch-page`, which is **not** part of that build
   and has to be pasted into the Supabase dashboard by hand.
 
-## Current state (as of 2026-08-16)
+## Current state (as of 2026-08-17)
+
+**Google auth + households** shipped in the app code (`scripts/schema-auth.sql`,
+`src/lib/auth.tsx`, `SignInScreen`/`HouseholdOnboardingScreen`, and every store module widened to
+carry `household_id`). **Neither Supabase script has been run against production yet** —
+`schema-auth.sql` then `scripts/reset-to-household-schema.sql` still need to run in the Supabase
+SQL editor, and the Google OAuth provider still needs configuring in the Supabase dashboard +
+Google Cloud Console, per those files' own header comments. `reset-to-household-schema.sql`
+deliberately wipes the nine existing tables' data (recipe priorities/swipes, decks, meal
+calendar, shopping list, imported recipes, photos, tag/recipe overrides) rather than migrating
+Cameron/Mallorie's existing rows onto real accounts — the first household starts fresh through
+normal sign-up instead. Until both scripts run, the old `'Cameron'`/`'Mallorie'` text columns and
+`anon full access` policies are still live in production — don't assume the new schema is
+actually in place there without checking. Deferred follow-ups (household management UI, N-way
+deck-sharing redesign, sign-up abuse consideration) are tracked as `NewIdeas.txt` item 1a–1c.
 
 **Recipe titles** are repaired at load time in `app/src/lib/recipeTitle.ts`, called once from
 `loadStaticRecipes()` in `lib/data.ts` so search, sorting and deck building all see the cleaned

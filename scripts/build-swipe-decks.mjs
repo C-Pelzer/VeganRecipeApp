@@ -1,18 +1,27 @@
 // Materializes one 'auto' swipe deck per (category, tag_slug) in
-// recipe_tags, layering recipe_tag_overrides on top the same way the app
-// does (app/src/lib/tags.ts effectiveTagsByRecipe), then replaces the full
-// contents of the 'auto' rows in swipe_decks/swipe_deck_recipes with the
-// result. Run this after tag-recipes.mjs, any time tags change and you want
-// decks to reflect it — decks are snapshots, not live filters, so nothing
-// updates until this is re-run.
+// recipe_tags, then replaces the full contents of the 'auto' rows in
+// swipe_decks/swipe_deck_recipes with the result. Run this after
+// tag-recipes.mjs, any time tags change and you want decks to reflect it —
+// decks are snapshots, not live filters, so nothing updates until this is
+// re-run.
+//
+// Auto decks are global (readable by every signed-in household, not scoped
+// to one), so — unlike the app's own effectiveTagsByRecipe
+// (app/src/lib/tags.ts) — this deliberately does NOT layer
+// recipe_tag_overrides on top: those are now a household's personal tag
+// edits (scripts/migrate-existing-household.sql), which can't coherently
+// apply to a deck shared across households. This script runs with the anon
+// key and no signed-in session, so it couldn't read that table even if it
+// tried — RLS scopes it to authenticated household members only.
 //
 // Each deck is capped at 40 recipes, chosen at random from that tag's
 // matches — re-running reshuffles which 40 show up. 'manual' decks (built by
 // hand in the Catalog deck builder) are untouched by this script.
 //
 // Usage: node --env-file=.env build-swipe-decks.mjs
-// (requires scripts/schema-swipe-decks.sql and
-// scripts/schema-recipe-tag-overrides.sql to have been run first)
+// (requires scripts/schema-swipe-decks.sql to have been run first, and
+// scripts/migrate-existing-household.sql if running against a database that
+// still has the pre-household-auth swipe_decks shape)
 
 import { createClient } from "@supabase/supabase-js";
 import fs from "node:fs";
@@ -73,11 +82,9 @@ async function fetchAll(table, columns) {
   return rows;
 }
 
-// Auto tags plus overrides layered on top, same semantics as
-// app/src/lib/tags.ts effectiveTagsByRecipe: 'remove' drops an auto tag,
-// 'add' introduces one that isn't there. Keyed by "category::tagSlug" so
-// two categories can each have (say) a "rice" slug without colliding.
-function buildEffectiveTagGroups(recipeTagRows, overrideRows, eligibleRecipeIds) {
+// Keyed by "category::tagSlug" so two categories can each have (say) a
+// "rice" slug without colliding.
+function buildTagGroups(recipeTagRows, eligibleRecipeIds) {
   const groups = new Map(); // "category::tagSlug" -> { category, tagSlug, label, recipeIds: Set }
 
   function group(category, tagSlug, label) {
@@ -89,13 +96,6 @@ function buildEffectiveTagGroups(recipeTagRows, overrideRows, eligibleRecipeIds)
   for (const row of recipeTagRows) {
     if (!eligibleRecipeIds.has(row.recipe_id)) continue;
     group(row.category, row.tag_slug, row.label).recipeIds.add(row.recipe_id);
-  }
-
-  for (const row of overrideRows) {
-    if (!eligibleRecipeIds.has(row.recipe_id)) continue;
-    const g = group(row.category, row.tag_slug, row.label);
-    if (row.action === "remove") g.recipeIds.delete(row.recipe_id);
-    else g.recipeIds.add(row.recipe_id);
   }
 
   return [...groups.values()].filter((g) => g.recipeIds.size > 0);
@@ -112,7 +112,8 @@ function buildDeckRows(groups) {
       source: "auto",
       category: g.category,
       tag_slug: g.tagSlug,
-      created_by: "system",
+      created_by: null,
+      household_id: null,
     });
     const sampled = shuffle([...g.recipeIds]).slice(0, MAX_DECK_SIZE);
     sampled.forEach((recipeId, position) => {
@@ -176,12 +177,9 @@ async function main() {
   const recipes = JSON.parse(fs.readFileSync(BUNDLE_PATH, "utf8"));
   const eligibleRecipeIds = new Set(recipes.filter(isDeckEligible).map((r) => r.id));
 
-  const [recipeTagRows, overrideRows] = await Promise.all([
-    fetchAll("recipe_tags", "recipe_id, category, tag_slug, label"),
-    fetchAll("recipe_tag_overrides", "recipe_id, category, tag_slug, label, action"),
-  ]);
+  const recipeTagRows = await fetchAll("recipe_tags", "recipe_id, category, tag_slug, label");
 
-  const allGroups = buildEffectiveTagGroups(recipeTagRows, overrideRows, eligibleRecipeIds);
+  const allGroups = buildTagGroups(recipeTagRows, eligibleRecipeIds);
   const groups = allGroups.filter((g) => ALLOWED_DECK_CATEGORIES.has(g.category));
   const skipped = allGroups.filter((g) => !ALLOWED_DECK_CATEGORIES.has(g.category));
   const { decks, deckRecipes } = buildDeckRows(groups);

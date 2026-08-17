@@ -1,12 +1,12 @@
 import { supabase } from '../supabaseClient'
-import type { HouseholdMember } from '../profile'
+import { getCurrentHouseholdId } from '../auth'
 import type { MealCalendarEntry, MealType } from '../../types/recipe'
 
 interface MealCalendarRow {
   entry_date: string
   meal_type: MealType
   recipe_id: string
-  assigned_to: HouseholdMember
+  assigned_to: string
   updated_at: string
 }
 
@@ -30,18 +30,17 @@ async function getEntriesInRange(startDate: string, endDate: string): Promise<Me
   return (data ?? []).map(rowToEntry)
 }
 
-async function setSlot(
-  entryDate: string,
-  mealType: MealType,
-  recipeId: string,
-  assignedTo: HouseholdMember,
-): Promise<void> {
-  const { error } = await supabase
-    .from('meal_calendar_entries')
-    .upsert(
-      { entry_date: entryDate, meal_type: mealType, recipe_id: recipeId, assigned_to: assignedTo },
-      { onConflict: 'entry_date,meal_type' },
-    )
+async function setSlot(entryDate: string, mealType: MealType, recipeId: string, assignedTo: string): Promise<void> {
+  const { error } = await supabase.from('meal_calendar_entries').upsert(
+    {
+      entry_date: entryDate,
+      meal_type: mealType,
+      recipe_id: recipeId,
+      assigned_to: assignedTo,
+      household_id: getCurrentHouseholdId(),
+    },
+    { onConflict: 'household_id,entry_date,meal_type' },
+  )
   if (error) throw error
 }
 

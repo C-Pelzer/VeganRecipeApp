@@ -1,4 +1,13 @@
-1: We need to implement some sort of Auth through Supabase. I want users to be able to login using their google account, and invite other users to join their group.
+1: DONE (2026-08-17) — Google OAuth + household groups shipped. Follow-ups spun out of that work,
+   not yet built:
+   1a: Household management UI — leave a household, remove a member, regenerate/revoke the
+       invite code, rename a household, transfer ownership. Right now a household can only be
+       created or joined, never managed afterward.
+   1b: Redesign swipe_deck_shares' sharing UX for households bigger than 2 — today you pick one
+       other member to send a deck to one at a time; worth deciding whether sharing should default
+       to "the whole household" instead once groups get bigger.
+   1c: Rate-limiting / abuse consideration — sign-up is now open to any Google account on a
+       Supabase free-tier project sized for 2 users. Worth a look before this gets shared widely.
 2: Extend the tinder mechanic to movies, tv shows, date night ideas, just about anything you want to decide on as a collective.
 3: Add an "undo" for the last swipe - a quick way to reverse an accidental left/right/remove without having to hunt the recipe back down in a deck.
 4: Let the household get notified when the other person shares a deck or the shopping list changes, instead of only finding out by opening the app and checking.

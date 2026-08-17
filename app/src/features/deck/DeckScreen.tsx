@@ -4,7 +4,6 @@ import { useRecipes } from '../../lib/data'
 import { store } from '../../lib/store/supabaseStore'
 import { deckStore } from '../../lib/store/deckStore'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import type { HouseholdMember } from '../../lib/profile'
 import type { Deck, Recipe, RecipePriority, SwipeDirection } from '../../types/recipe'
 import { SwipeCard, type SwipeCardHandle } from './SwipeCard'
 import { DECKS, DEFAULT_DECK } from './decks'
@@ -52,7 +51,7 @@ function buildQueue(recipes: Recipe[], priorities: RecipePriority[], deck: Deck)
 }
 
 interface DeckScreenProps {
-  currentUser: HouseholdMember
+  currentUser: string
   onOpenMenu: () => void
   onViewRecipe: (recipeId: string) => void
 }

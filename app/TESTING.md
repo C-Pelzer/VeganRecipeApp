@@ -26,7 +26,9 @@ will print whatever's current).
 
 Open the `localhost` URL in a browser.
 
-- **Profile picker** shows on first load — tap "Cameron" or "Mallorie".
+- **Sign in with Google** shows on first load. On success, if your account isn't in a household
+  yet you land on the household screen — create one, or join an existing one with its invite
+  code (shown in the nav drawer once you're in).
 - **Deck** loads with a counter (`0 / 4741`) and a deck picker at the top (**New** / **Everything**).
   - **New** only shows recipes you've never swiped.
   - **Everything** shows all eligible recipes, including ones you've swiped before — recipes
@@ -38,26 +40,29 @@ Open the `localhost` URL in a browser.
   - 🗑 / drag down — remove entirely, regardless of current priority.
   - Priority starts at 5 per recipe; hitting 0 via repeated passes removes it too, same as the
     trash button.
-- **Favorites screen**: tap the ★ next to your name. Two tabs:
+- **Favorites screen**: tap the ★. Two tabs:
   - **Yours** — everything you've favorited (and not since removed).
-  - **Shared** — the live intersection of both your and Mallorie's favorites (this is what
+  - **Shared** — the live intersection of every household member's favorites (this is what
     "match" means now — no calendar, just this list).
 - **Reload the page** — deck/favorites state should persist (synced through Supabase, not just
-  local).
-- **Switch user**: dev tools → Application → Local Storage → delete `recipe-app:currentUser` →
-  reload → picker reappears. Mallorie's priorities/favorites are entirely independent of
-  Cameron's.
+  local), and you should land straight back in the app (no re-sign-in) since Supabase persists
+  the session.
+- **Sign out**: nav drawer → Sign out. You should land back on the Google sign-in screen.
 
-## 4. Test both people's swipes actually meet in the middle
+## 4. Test two household members' swipes actually meet in the middle
 
 This is the part that most needs a real check, since it's the whole point of "Shared":
 
-1. As Cameron, favorite (♥) some recipe.
-2. Switch user to Mallorie (clear `recipe-app:currentUser` in Local Storage, reload, pick her).
-3. Favorite the *same* recipe (you'll need to find it — "New" deck order is deterministic, so
-   if you haven't swiped anything as Mallorie yet, her first card matches whatever Cameron's
-   first card originally was).
-4. Open Favorites → Shared as either user — that recipe should now be listed.
+1. Sign in with your Google account, create a household, and favorite (♥) some recipe.
+2. Sign in with a second Google account on another device/browser profile (or an incognito
+   window) and join the same household using its invite code (nav drawer of the first account).
+3. Favorite the *same* recipe as the second account (you'll need to find it — "New" deck order
+   is deterministic, so if the second account hasn't swiped anything yet, its first card matches
+   whatever the first account's first card originally was).
+4. Open Favorites → Shared on either account — that recipe should now be listed.
+5. Confirm a *third*, unrelated Google account (not invited to this household) sees none of
+   this — a fresh sign-in with no invite code should only be able to create its own empty
+   household, never read or write this one's data.
 
 ## 5. Test on your phone
 
@@ -70,8 +75,8 @@ This is the part that most needs a real check, since it's the whole point of "Sh
 6. Turn on airplane mode after it's loaded once, relaunch from the home screen icon, and
    confirm the deck still loads from cache (validates the offline PWA caching). A swipe made
    offline should still register locally and sync once you're back online.
-7. Have Mallorie install it on her own phone and repeat the two-person check from step 4 for
-   real, instead of simulating her side.
+7. Have another household member install it on their own phone and repeat the multi-member check
+   from step 4 for real, instead of simulating their side.
 
 ## 6. Sanity-check the data prep, if you touch the scripts
 
@@ -90,6 +95,7 @@ after a heuristic tweak, something's off.
 ## 7. If you want to poke at the data directly
 
 The Supabase dashboard (Table Editor) lets you look at `recipe_priority` and `swipe_events`
-directly — handy for confirming a swipe actually landed, or resetting your own test data
-(`delete from recipe_priority where user_id = 'Cameron'` clears just your priorities, not
-Mallorie's).
+directly — handy for confirming a swipe actually landed, or resetting your own test data. `user_id`
+is now a real `profiles.id` uuid (find yours via the `profiles` table, matched by `email`), and
+every row also carries `household_id` — `delete from recipe_priority where user_id = '<your
+uuid>'` clears just your priorities, not the rest of your household's.

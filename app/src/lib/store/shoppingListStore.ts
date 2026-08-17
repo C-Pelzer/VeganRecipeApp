@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient'
 import { computeDeltas, parseManualEntry, type QuantityDelta } from '../shoppingListMath'
+import { getCurrentHouseholdId } from '../auth'
 import type { Recipe, ShoppingListItem } from '../../types/recipe'
 
 interface ShoppingListRow {
@@ -9,6 +10,7 @@ interface ShoppingListRow {
   qty_notes: string
   checked: boolean
   updated_at: string
+  household_id?: string
 }
 
 function rowToItem(row: ShoppingListRow): ShoppingListItem {
@@ -72,6 +74,7 @@ async function mergeDeltas(deltas: Map<string, QuantityDelta>): Promise<void> {
       // tracking, accepted as a known limitation at this scale.
       checked: false,
       updated_at: new Date().toISOString(),
+      household_id: getCurrentHouseholdId(),
     })
   }
 
@@ -126,6 +129,7 @@ async function subtractRecipes(recipes: Recipe[]): Promise<void> {
         qty_notes: current.qtyNotes,
         checked: current.checked,
         updated_at: new Date().toISOString(),
+        household_id: getCurrentHouseholdId(),
       })
     }
   }

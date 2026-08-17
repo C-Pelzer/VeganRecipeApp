@@ -1,6 +1,6 @@
 import { supabase } from '../supabaseClient'
 import { uploadPhoto } from '../uploadPhoto'
-import type { HouseholdMember } from '../profile'
+import { getCurrentHouseholdId } from '../auth'
 import type { RecipePhoto } from '../../types/recipe'
 
 const BUCKET = 'recipe-images'
@@ -9,7 +9,7 @@ interface RecipePhotoRow {
   id: string
   recipe_id: string
   photo_url: string
-  added_by: HouseholdMember
+  added_by: string
   added_at: string
 }
 
@@ -41,12 +41,17 @@ async function listPhotos(recipeId: string): Promise<RecipePhoto[]> {
   return (data as RecipePhotoRow[]).map(rowToPhoto)
 }
 
-async function addPhoto(recipeId: string, file: File, addedBy: HouseholdMember): Promise<RecipePhoto> {
+async function addPhoto(recipeId: string, file: File, addedBy: string): Promise<RecipePhoto> {
   const publicUrl = await uploadPhoto(recipeId, file, 'post-cook')
 
   const { data: row, error: insertError } = await supabase
     .from('recipe_photos')
-    .insert({ recipe_id: recipeId, photo_url: publicUrl, added_by: addedBy })
+    .insert({
+      recipe_id: recipeId,
+      photo_url: publicUrl,
+      added_by: addedBy,
+      household_id: getCurrentHouseholdId(),
+    })
     .select('*')
     .single()
   if (insertError) throw insertError

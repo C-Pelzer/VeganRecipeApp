@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient'
 import { shoppingListStore } from './shoppingListStore'
+import { getCurrentHouseholdId } from '../auth'
 import type { MealPlanEntry, Recipe } from '../../types/recipe'
 
 interface MealPlanRow {
@@ -19,10 +20,11 @@ async function getEntries(): Promise<MealPlanEntry[]> {
 
 async function addRecipes(recipeIds: string[]): Promise<void> {
   if (recipeIds.length === 0) return
-  const rows = recipeIds.map((recipe_id) => ({ recipe_id }))
+  const householdId = getCurrentHouseholdId()
+  const rows = recipeIds.map((recipe_id) => ({ recipe_id, household_id: householdId }))
   const { error } = await supabase
     .from('meal_plan_items')
-    .upsert(rows, { onConflict: 'recipe_id', ignoreDuplicates: true })
+    .upsert(rows, { onConflict: 'household_id,recipe_id', ignoreDuplicates: true })
   if (error) throw error
 }
 

@@ -1,5 +1,6 @@
 import { supabase } from '../supabaseClient'
 import { fetchAllRows } from '../fetchAllRows'
+import { getCurrentHouseholdId } from '../auth'
 import { LocalStore } from './localStore'
 import type { SyncStore } from './types'
 import type { RecipePriority, SwipeDirection } from '../../types/recipe'
@@ -85,6 +86,7 @@ export class SupabaseStore implements SyncStore {
       p_recipe_id: swipe.recipeId,
       p_direction: swipe.direction,
       p_deck_id: swipe.deckId,
+      p_household_id: getCurrentHouseholdId(),
     })
     if (error) {
       console.warn('apply_swipe RPC failed', error)

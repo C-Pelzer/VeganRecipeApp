@@ -12,8 +12,9 @@ import { MealCalendarScreen } from './features/mealCalendar/MealCalendarScreen'
 import { ImportRecipeScreen } from './features/importRecipe/ImportRecipeScreen'
 import { AddRecipeScreen } from './features/addRecipe/AddRecipeScreen'
 import { CatalogScreen } from './features/catalog/CatalogScreen'
-import { ProfilePicker } from './features/profile/ProfilePicker'
-import { clearCurrentUser, getCurrentUser, setCurrentUser, type HouseholdMember } from './lib/profile'
+import { SignInScreen } from './features/auth/SignInScreen'
+import { HouseholdOnboardingScreen } from './features/auth/HouseholdOnboardingScreen'
+import { useAuth } from './lib/auth'
 
 // A backgrounded mobile tab (e.g. while the native camera app is in the
 // foreground for a photo upload) can get its process killed for memory and
@@ -22,7 +23,7 @@ import { clearCurrentUser, getCurrentUser, setCurrentUser, type HouseholdMember 
 const VIEWING_RECIPE_KEY = 'recipe-app:viewingRecipeId'
 
 function App() {
-  const [currentUser, setCurrentUserState] = useState<HouseholdMember | null>(getCurrentUser)
+  const { loading, session, profile, household, signOut } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [viewingRecipeId, setViewingRecipeIdState] = useState<string | null>(() =>
     sessionStorage.getItem(VIEWING_RECIPE_KEY),
@@ -34,112 +35,115 @@ function App() {
     else sessionStorage.removeItem(VIEWING_RECIPE_KEY)
   }
 
-  function handleSelect(user: HouseholdMember) {
-    setCurrentUser(user)
-    setCurrentUserState(user)
+  if (loading) {
+    return <div className="h-full overflow-hidden bg-neutral-950" />
   }
 
-  function handleSwitchUser() {
-    clearCurrentUser()
-    setCurrentUserState(null)
-    setMenuOpen(false)
+  if (!session) {
+    return (
+      <div className="h-full overflow-hidden bg-neutral-950">
+        <SignInScreen />
+      </div>
+    )
   }
+
+  if (!profile || !household) {
+    return (
+      <div className="h-full overflow-hidden bg-neutral-950">
+        <HouseholdOnboardingScreen />
+      </div>
+    )
+  }
+
+  const currentUser = profile.id
 
   return (
     <div className="h-full overflow-hidden bg-neutral-950">
-      {currentUser ? (
-        <BrowserRouter>
-          <NavDrawer
-            isOpen={menuOpen}
-            onClose={() => setMenuOpen(false)}
-            currentUser={currentUser}
-            onSwitchUser={handleSwitchUser}
-            onSwitchTo={handleSelect}
+      <BrowserRouter>
+        <NavDrawer
+          isOpen={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          profile={profile}
+          household={household}
+          onSignOut={() => void signOut()}
+        />
+        <RecipeDetailModal
+          recipeId={viewingRecipeId}
+          currentUser={currentUser}
+          onClose={() => setViewingRecipeId(null)}
+        />
+        <Routes>
+          <Route
+            path="/"
+            element={<DecksHomeScreen currentUser={currentUser} onOpenMenu={() => setMenuOpen(true)} />}
           />
-          <RecipeDetailModal
-            recipeId={viewingRecipeId}
-            currentUser={currentUser}
-            onClose={() => setViewingRecipeId(null)}
+          <Route
+            path="/deck/:deckId"
+            element={
+              <DeckScreen
+                currentUser={currentUser}
+                onOpenMenu={() => setMenuOpen(true)}
+                onViewRecipe={setViewingRecipeId}
+              />
+            }
           />
-          <Routes>
-            <Route
-              path="/"
-              element={<DecksHomeScreen currentUser={currentUser} onOpenMenu={() => setMenuOpen(true)} />}
-            />
-            <Route
-              path="/deck/:deckId"
-              element={
-                <DeckScreen
-                  currentUser={currentUser}
-                  onOpenMenu={() => setMenuOpen(true)}
-                  onViewRecipe={setViewingRecipeId}
-                />
-              }
-            />
-            <Route
-              path="/favorites"
-              element={
-                <FavoritesScreen
-                  currentUser={currentUser}
-                  onOpenMenu={() => setMenuOpen(true)}
-                  onViewRecipe={setViewingRecipeId}
-                />
-              }
-            />
-            <Route
-              path="/shopping-list"
-              element={<ShoppingListScreen onOpenMenu={() => setMenuOpen(true)} />}
-            />
-            <Route
-              path="/meal-plan"
-              element={
-                <MealPlanScreen onOpenMenu={() => setMenuOpen(true)} onViewRecipe={setViewingRecipeId} />
-              }
-            />
-            <Route
-              path="/meal-calendar"
-              element={
-                <MealCalendarScreen onOpenMenu={() => setMenuOpen(true)} onViewRecipe={setViewingRecipeId} />
-              }
-            />
-            <Route
-              path="/import"
-              element={
-                <ImportRecipeScreen
-                  currentUser={currentUser}
-                  onOpenMenu={() => setMenuOpen(true)}
-                  onViewRecipe={setViewingRecipeId}
-                />
-              }
-            />
-            <Route
-              path="/add-recipe"
-              element={
-                <AddRecipeScreen
-                  currentUser={currentUser}
-                  onOpenMenu={() => setMenuOpen(true)}
-                  onViewRecipe={setViewingRecipeId}
-                />
-              }
-            />
-            <Route
-              path="/catalog"
-              element={
-                <CatalogScreen
-                  currentUser={currentUser}
-                  onOpenMenu={() => setMenuOpen(true)}
-                  onViewRecipe={setViewingRecipeId}
-                />
-              }
-            />
-            {/* An unknown URL used to render a blank black page. */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-          <BottomTabBar currentUser={currentUser} />
-        </BrowserRouter>
-      ) : (
-        <ProfilePicker onSelect={handleSelect} />
-      )}
+          <Route
+            path="/favorites"
+            element={
+              <FavoritesScreen
+                currentUser={currentUser}
+                onOpenMenu={() => setMenuOpen(true)}
+                onViewRecipe={setViewingRecipeId}
+              />
+            }
+          />
+          <Route
+            path="/shopping-list"
+            element={<ShoppingListScreen onOpenMenu={() => setMenuOpen(true)} />}
+          />
+          <Route
+            path="/meal-plan"
+            element={<MealPlanScreen onOpenMenu={() => setMenuOpen(true)} onViewRecipe={setViewingRecipeId} />}
+          />
+          <Route
+            path="/meal-calendar"
+            element={<MealCalendarScreen onOpenMenu={() => setMenuOpen(true)} onViewRecipe={setViewingRecipeId} />}
+          />
+          <Route
+            path="/import"
+            element={
+              <ImportRecipeScreen
+                currentUser={currentUser}
+                onOpenMenu={() => setMenuOpen(true)}
+                onViewRecipe={setViewingRecipeId}
+              />
+            }
+          />
+          <Route
+            path="/add-recipe"
+            element={
+              <AddRecipeScreen
+                currentUser={currentUser}
+                onOpenMenu={() => setMenuOpen(true)}
+                onViewRecipe={setViewingRecipeId}
+              />
+            }
+          />
+          <Route
+            path="/catalog"
+            element={
+              <CatalogScreen
+                currentUser={currentUser}
+                onOpenMenu={() => setMenuOpen(true)}
+                onViewRecipe={setViewingRecipeId}
+              />
+            }
+          />
+          {/* An unknown URL used to render a blank black page. */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        <BottomTabBar currentUser={currentUser} />
+      </BrowserRouter>
     </div>
   )
 }
