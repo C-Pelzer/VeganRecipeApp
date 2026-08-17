@@ -2,3 +2,4 @@
 2: Extend the tinder mechanic to movies, tv shows, date night ideas, just about anything you want to decide on as a collective.
 3: Add an "undo" for the last swipe - a quick way to reverse an accidental left/right/remove without having to hunt the recipe back down in a deck.
 4: Let the household get notified when the other person shares a deck or the shopping list changes, instead of only finding out by opening the app and checking.
+5: we need to adjust how the shopping list works. right now it feels cluttered and messy based on the large lists of ingredients we are pulling in.
