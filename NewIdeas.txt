@@ -12,3 +12,15 @@
 3: Add an "undo" for the last swipe - a quick way to reverse an accidental left/right/remove without having to hunt the recipe back down in a deck.
 4: Let the household get notified when the other person shares a deck or the shopping list changes, instead of only finding out by opening the app and checking.
 5: we need to adjust how the shopping list works. right now it feels cluttered and messy based on the large lists of ingredients we are pulling in.
+6: DONE (2026-08-19) — ingredient sectioning repaired by repair_sections.py; 1,032 ingredient
+   lines that extract.py had stranded in `notes` are back in the ingredient list and the shopping
+   list. What it could NOT fix, and why:
+   6a: 79 recipes still show a flat ingredient list even though the book had named sections. The
+       ingredients are all there and correct; only the boundaries are lost, and the method didn't
+       give enough evidence to place them confidently (a wrong grouping is worse than none). Would
+       need the source EPUBs to fix properly.
+   6b: 10 ingredient-shaped lines are still sitting in `notes` — each is a lone line with no
+       neighbouring ingredients, which is indistinguishable from a real note like "1 batch keeps a
+       week", so the recovery pass deliberately leaves singles alone.
+   6c: Tagging and swipe decks have NOT been re-run against the recovered ingredients.
+       `tag-recipes.mjs --dry-run` reports +122/-41 tags, then build-swipe-decks.mjs after it.

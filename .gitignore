@@ -15,3 +15,9 @@ scripts/upload-manifest.json
 /recipes.json
 /report.json
 scripts/tag-report.txt
+
+# repair_sections.py's output — regenerable from recipes_metric.json in one run,
+# and 42MB, so it's treated like /recipes.json rather than tracked. The bundle it
+# feeds (app/public/data/recipes.json) is what actually ships and stays tracked.
+/recipes_repaired.json
+/section-repair-report.txt

@@ -1,7 +1,13 @@
-// Merges recipes_metric.json with the image manifest and flags likely sub-recipes,
-// producing the bundle the app fetches at runtime.
+// Merges the extraction output with the image manifest and flags likely
+// sub-recipes, producing the bundle the app fetches at runtime.
 //
 // Usage: node scripts/build-bundle.mjs (run extract-images.mjs first)
+//
+// Reads recipes_repaired.json in preference to recipes_metric.json. That file is
+// repair_sections.py's output -- same shape, with the ingredient sectioning
+// damage described in its docstring fixed. Regenerate it with
+// `python repair_sections.py` after the Python pipeline runs, or delete it to
+// build straight from recipes_metric.json.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -141,10 +147,14 @@ function stripUnusedFields(recipe) {
   return stripped;
 }
 
+function recipesPath() {
+  const repaired = path.join(ROOT, "recipes_repaired.json");
+  return fs.existsSync(repaired) ? repaired : path.join(ROOT, "recipes_metric.json");
+}
+
 function main() {
-  const recipes = JSON.parse(
-    fs.readFileSync(path.join(ROOT, "recipes_metric.json"), "utf8")
-  );
+  const sourcePath = recipesPath();
+  const recipes = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
   const manifest = JSON.parse(
     fs.readFileSync(path.join(ROOT, "scripts", "image-manifest.json"), "utf8")
   );
@@ -171,7 +181,10 @@ function main() {
   fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
   fs.writeFileSync(OUT_PATH, JSON.stringify(bundle));
 
-  console.log(`Wrote ${bundle.length} recipes to ${path.relative(ROOT, OUT_PATH)}`);
+  console.log(
+    `Wrote ${bundle.length} recipes to ${path.relative(ROOT, OUT_PATH)} ` +
+      `(from ${path.basename(sourcePath)})`
+  );
   console.log(
     `  ${withImageCount} with images, ${componentCount} flagged as sub-recipes, ` +
       `${noStepsCount} with no method steps`

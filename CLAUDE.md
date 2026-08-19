@@ -20,7 +20,7 @@ feature set has grown well past them (see Architecture below).
 repo root (Python)        scripts/ (Node)              app/ (React PWA)
 extract.py, apply_metric.py, build_density.py  ->  extract-images.mjs, build-bundle.mjs,
 recipes_metric.json (source of truth)              tag-recipes.mjs, build-swipe-decks.mjs
-                                                    -> app/public/data/recipes.json
+  -> repair_sections.py -> recipes_repaired.json    -> app/public/data/recipes.json
                                                        app/public/images/recipes/*.jpg
 ```
 
@@ -30,6 +30,12 @@ recipes_metric.json (source of truth)              tag-recipes.mjs, build-swipe-
   data schema (Recipe/Ingredient field meanings, the rules the UI must respect around
   `weighable`/`approx`/`ingredient_groups`) is documented in `CLAUDE_CODE_BRIEF.md` — read it
   before touching anything that consumes `recipes_metric.json` or `Recipe`/`Ingredient` types.
+- **`repair_sections.py`** (repo root): the one thing that *does* rewrite that output, into a
+  separate `recipes_repaired.json` — a repair pass for ingredient-sectioning damage `extract.py`
+  left behind and can't be re-run to fix (no EPUBs). It imports `extract`/`apply_metric` rather
+  than reimplementing them, so repaired ingredients carry real grams. `build-bundle.mjs` prefers
+  `recipes_repaired.json` when it exists. Read its docstring before touching anything about
+  `ingredient_groups`; see "Ingredient sectioning" under Current state.
 - **Node data-prep** (`scripts/`): pulls hero photos out of source EPUBs, uploads them to
   Supabase Storage, tags recipes, builds the auto swipe decks, and merges everything into the
   bundle the app fetches at runtime. Only needs re-running after the Python pipeline processes
@@ -45,6 +51,10 @@ npm run dev              # vite dev server — prints a Network URL for phone te
 npm run build             # tsc -b && vite build
 npm run lint               # oxlint
 npm run preview
+
+# Section repair (from repo root, after re-running the Python pipeline or changing its heuristics)
+python repair_sections.py --dry-run    # writes section-repair-report.txt, no JSON
+python repair_sections.py             # -> recipes_repaired.json (build-bundle.mjs prefers it)
 
 # Data prep (from scripts/, only after re-running the Python pipeline or changing tagging/deck logic)
 node extract-images.mjs
@@ -207,6 +217,48 @@ conservative (a misfiled produce item is a missed purchase), while `classifyAisl
 (every aisle renders expanded, so a wrong heading is only cosmetic). Both must cope with the
 extractor leaving packaging and prep words in the item name — `can black beans` is a canned good,
 not dry beans.
+
+**Ingredient sectioning** is repaired by `repair_sections.py` (repo root) at pipeline time rather
+than load time, because unlike title repair it needs `extract.parse_ingredient` and
+`apply_metric.run` to give recovered ingredients real grams, and because fixing it upstream of the
+bundle means `tag-recipes.mjs` and `build-swipe-decks.mjs` — which read the bundle, not
+`recipes_metric.json` — pick the recovery up for free. Root cause: `extract.py` only accepts an
+ingredient line while the recipe has no steps yet (`looks_ing and not cur['steps']`), and several
+Page Street books put their extra ingredient sections in a sidebar that comes *after* the method in
+XHTML reading order. Those lines fell through to `notes`; `GROUP_HDR` has no such guard, so the
+section was still created, empty. 259 recipes showed an empty section card, and **1,032 real
+ingredient lines never reached the ingredient list, the shopping list or the tagger** — "My Famous
+Vegan Cinnamon Rolls" shipped with no cinnamon, sugar or frosting. The pass recovers those from
+`notes` (including headers `GROUP_HDR` never matched, like `VEGAN CREAM CHEESE FROSTING`), moves 15
+swallowed step sentences back into the method and 9 yield lines into `servings_text`, splits 48
+headers that landed as quantity-less ingredient *rows*, and drops whatever is still empty. Where
+ingredients were merged into one unnamed group so only the boundaries were lost (Coconut COOKIE
+BUTTER BARS: 13 ingredients, 3 orphaned layer names), boundaries are inferred from the method by DP
+over contiguous runs — but only 20 of 99 candidates pass the gate, deliberately, since a wrong
+grouping in a recipe you're cooking from is worse than a flat list. Three traps worth knowing if
+you touch the heuristics:
+- **Score density does not detect a bad split.** LOBSTER MUSHROOM Bisque's wrong 10/5 split scored
+  higher than most correct ones. What separates them is whether a section's step anchor was
+  *found* in the method or interpolated — hence the `anchor_found` gate.
+- **Header vocabulary has to be tiered.** A first pass treating any short Title-Case noun phrase
+  as a header made 3,576 false splits, turning every "Lime wedges" and "Sesame seeds" garnish row
+  into a section. STRONG nouns stand alone; SOFT ones ("cream", "sauce", "drizzle") need ALL CAPS
+  or a "for the" prefix, because they double as real ingredients.
+- **A component name is often a cross-reference, not a heading.** "Flaky Pie Crust" as an
+  ingredient row means "use the Flaky Pie Crust recipe". Two signals reject those: nothing follows
+  it in the group, or it matches another recipe's title in the same book (the same signal
+  `build-bundle.mjs` uses for `isComponent`).
+- **Ingredient-shaped is not the same as an ingredient.** Recovering any run of short, quantity-less
+  note lines pulled in a sidebar of *suggested* broth vegetables (32 unpriced nouns onto the
+  shopping list) and a list of method headings ("COCINANDO", "Assemble the Sandwich"). A run now has
+  to contain at least two lines carrying a real measurement before any of it is recovered.
+
+Ties break toward keeping an ingredient throughout — a garnish misfiled into the ingredient list is
+correct, a garnish mistaken for a header is an ingredient lost twice. `section-repair-report.txt`
+(gitignored, like `tag-report.txt`) logs every change per recipe; read it before trusting a
+heuristic change. Re-running the pass changes tagging inputs: `tag-recipes.mjs --dry-run` currently
+reports +122/−41 tags against the live table, so **tagging and deck-building should be re-run**
+(by hand, per the delete-then-insert warning above).
 
 **Recipe titles** are repaired at load time in `app/src/lib/recipeTitle.ts`, called once from
 `loadStaticRecipes()` in `lib/data.ts` so search, sorting and deck building all see the cleaned
