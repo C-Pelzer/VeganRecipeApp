@@ -63,6 +63,15 @@ DIET = re.compile(r'\b(nut[- ]free|soy[- ]free|gluten[- ]free|oil[- ]free|raw|su
 OPTIONAL = re.compile(r'\b(optional|to taste|if desired|as needed|for serving|for garnish)\b', re.I)
 
 YIELD_LABEL = re.compile(r'^\s*(serves?|makes|yields?|serving\s+size)\s*:?\s*$', re.I)
+# Anything opening with these words is a yield line, whatever follows. SERVES
+# above needs a digit right after the verb and so misses "MAKES ~ 1 LITER",
+# "Makes one 8-9-inch tart" and "MAKES AROUND 5 CUPS"; no ingredient section is
+# ever named "Makes ...", so the bare prefix is a safe test on its own. Note
+# "Serving Suggestions" doesn't match -- \b won't break inside "serving".
+YIELD_START = re.compile(r'^\s*(?:(?:serves?|makes|yields?)\b|servings?\s*[:\d])', re.I)
+# Amount words that open a real ingredient with no numeral ("Pinch of chili
+# flakes", "Drizzle of maple syrup"). Without this they read as bare labels.
+AMOUNT_WORD = re.compile(r'^\s*(?:pinch|dash|handful|drizzle|splash|squeeze|sprinkling|few)\b', re.I)
 YIELD_NOUN = re.compile(r'^(pizzas?|servings?|portions?|people|cookies|bars?|muffins?|loaves|'
                         r'loaf|cakes?|pies?|quarts?|cups?|dozen|slices?|pancakes?|waffles?|'
                         r'donuts?|rolls?|burgers?|tacos?|bowls?|jars?|batches?|sandwiches)\b', re.I)
@@ -260,6 +269,16 @@ def parse_doc(book_title, doc, bl, roles):
             r['servings'] = first['quantity']
             gs[0]['ingredients'].pop(0)
 
+    def next_is_ing(i):
+        """Is the block after i an ingredient line? (used to spot section headers)"""
+        for tag, key, txt in bl[i + 1:i + 2]:
+            if tag in ('h1', 'h2', 'h3'):
+                return False
+            return bool(key in ing_cls or (
+                not ing_cls and len(txt) <= 110
+                and QTY_START.match(txt) and QTY_LINE.match(txt)))
+        return False
+
     def flush():
         nonlocal cur
         if cur:
@@ -341,9 +360,50 @@ def parse_doc(book_title, doc, bl, roles):
             not ing_cls and len(txt) <= 110 and QTY_START.match(txt) and QTY_LINE.match(txt))
         looks_step = (key in step_cls) or (not step_cls and len(txt) > 115)
 
-        if GROUP_HDR.match(txt) and len(txt) < 70:
-            cur['ingredient_groups'].append({'name': norm(txt).rstrip(':'), 'ingredients': []})
-            continue
+        # A label rather than content: an ingredient-section header, or one of
+        # the method headings these books interleave with their steps. Three
+        # guards keep non-labels out, each for a case that actually came up:
+        #   - terminal punctuation and a word cap exclude real prose, since the
+        #     drop below would otherwise delete a short genuine step ("Lower the
+        #     heat of the oven to 350°F (177°C).");
+        #   - YIELD_START excludes yield lines, which the metadata branch above
+        #     banks without consuming, and which would otherwise have named 1,422
+        #     sections after the serving count; AMOUNT_WORD keeps numeral-less
+        #     ingredients ("Pinch of chili flakes") out for the same reason, and
+        #     the letter count drops decorative rules ("______________", 87 of
+        #     which became section names);
+        #   - ingredient-class lines stay ingredients unless GROUP_HDR vouches for
+        #     them, for books whose headers share the ingredient class.
+        # Step-*class* lines are deliberately still eligible: Delicious AF Vegan's
+        # section headers share the step class, separated only by length.
+        heading_shaped = (len(txt) < 70 and len(txt.split()) <= 8
+                          and sum(c.isalpha() for c in txt) >= 3
+                          and not txt.endswith(('.', '!', '?', ':'))
+                          and not QTY_START.match(txt)
+                          and not YIELD_START.match(txt)
+                          and not AMOUNT_WORD.match(txt)
+                          and (not looks_ing or GROUP_HDR.match(txt)))
+        if heading_shaped:
+            # Which kind it is comes from what *follows* it, not from its wording
+            # or its class -- both are unreliable. GROUP_HDR never matched "SUGAR
+            # COOKIE LAYER" or "Chai-Spiced Whipped Cream", and the class is no
+            # help either: The Ultimate Vegan Cookbook styles ingredient headers
+            # and method headings identically (p.receipe), while Delicious AF
+            # Vegan puts its headers in the same class as its steps
+            # (p.nonindent1), separated only by length. Sitting directly above an
+            # ingredient line is what reliably tells them apart.
+            if next_is_ing(i) and not cur['steps']:
+                cur['ingredient_groups'].append(
+                    {'name': norm(txt).rstrip(':'), 'ingredients': []})
+                continue
+            if cur['ingredient_groups'] and (cur['steps'] or GROUP_HDR.match(txt)):
+                # A method heading ("FOR THE CHOCOLATE LAYER" above its step).
+                # Dropped rather than kept: appending it to `steps` would read as
+                # a step of its own, and letting it reach `notes` fills the
+                # recipe's Notes with stray labels. Creating an ingredient group
+                # for it is what used to leave empty sections on screen. Anything
+                # less clear-cut falls through to the old behaviour instead.
+                continue
 
         if looks_ing and not cur['steps']:
             if not cur['ingredient_groups']:

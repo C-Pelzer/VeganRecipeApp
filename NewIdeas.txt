@@ -12,15 +12,26 @@
 3: Add an "undo" for the last swipe - a quick way to reverse an accidental left/right/remove without having to hunt the recipe back down in a deck.
 4: Let the household get notified when the other person shares a deck or the shopping list changes, instead of only finding out by opening the app and checking.
 5: we need to adjust how the shopping list works. right now it feels cluttered and messy based on the large lists of ingredients we are pulling in.
-6: DONE (2026-08-19) — ingredient sectioning repaired by repair_sections.py; 1,032 ingredient
-   lines that extract.py had stranded in `notes` are back in the ingredient list and the shopping
-   list. What it could NOT fix, and why:
-   6a: 79 recipes still show a flat ingredient list even though the book had named sections. The
-       ingredients are all there and correct; only the boundaries are lost, and the method didn't
-       give enough evidence to place them confidently (a wrong grouping is worse than none). Would
-       need the source EPUBs to fix properly.
-   6b: 10 ingredient-shaped lines are still sitting in `notes` — each is a lone line with no
-       neighbouring ingredients, which is indistinguishable from a real note like "1 batch keeps a
-       week", so the recovery pass deliberately leaves singles alone.
-   6c: Tagging and swipe decks have NOT been re-run against the recovered ingredients.
-       `tag-recipes.mjs --dry-run` reports +122/-41 tags, then build-swipe-decks.mjs after it.
+6: DONE (2026-08-19) - ingredient sectioning fixed properly, in extract.py itself. The source
+   EPUBs turned out to be on disk at C:\Users\Cameron\Documents\Vegan Cookbooks (61 books, 11GB)
+   - an earlier note saying they were "no longer in the repo" was read as "lost", so the first
+   attempt built a repair pass around damage the extractor could just be fixed to avoid. Both now
+   exist: extract.py gets it right at source, repair_sections.py cleans up the residue.
+   Result: section headers 2,416 -> 5,546, recipes with real sections 630 -> 1,824, empty section
+   cards 515 -> 0, +1,032 ingredients into the ingredient and shopping lists, and zero recipe-id
+   churn (nothing in Supabase was orphaned). Tags and decks rebuilt.
+   What's still not fixed, and why:
+   6a: 56 recipes whose title is a yield line ("SERVES 2", mostly Effortless Vegan). Now fixable
+       in principle - the EPUBs are available - but the real name was never in the extracted
+       text, so it needs new extractor logic, and fixing a title changes that recipe's id (sha1
+       of book|file|title), which orphans its swipes/favorites/meal-plan rows. Cheap to do while
+       those tables are near-empty; expensive once the household has been swiping for a while.
+   6b: 767 partially-capsed titles ("Easy Red Lentil DAL") left alone - flattening them would
+       wreck real acronyms.
+   6c: 16 short label-shaped lines dropped corpus-wide by the extractor fix. 10 are genuine
+       headings; 6 are numeral-less garnish items ("Your favorite gravy", "Lettuce and/or onion")
+       that had previously been misfiled as method *steps*, so they were already in the wrong
+       place. Recoverable by widening AMOUNT_WORD in extract.py if it ever matters.
+   6d: Method headings ("FOR THE CHOCOLATE LAYER" above its step) are dropped rather than shown.
+       Prepending each to its step would make the method much more readable in the ~200 recipes
+       that have them - deliberately left out of scope, since it rewrites user-visible step text.

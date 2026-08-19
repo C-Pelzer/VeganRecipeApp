@@ -1,7 +1,8 @@
 // Titles come out of the EPUB pipeline carrying each cookbook's own
 // typography. Two artifacts of that are worth correcting at load time, since
 // `recipes.json` is generated and must not be hand-edited (and re-running the
-// Python pipeline would need the source EPUBs, which aren't in the repo):
+// Python pipeline is a heavier lift — the books live outside the repo, at
+// C:\Users\Cameron\Documents\Vegan Cookbooks):
 //
 //   1. ~36% of the library is ALL CAPS, because roughly half the books set
 //      their recipe names that way. It's faithful to the book but makes a

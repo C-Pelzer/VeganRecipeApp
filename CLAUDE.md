@@ -24,18 +24,22 @@ recipes_metric.json (source of truth)              tag-recipes.mjs, build-swipe-
                                                        app/public/images/recipes/*.jpg
 ```
 
-- **Python pipeline** (repo root): EPUB → structured recipe JSON. Treat `extract.py`,
-  `apply_metric.py`, `build_density.py`, and their output (`recipes_metric.json`,
-  `density_table.json`, `density_curated.json`) as stable inputs, not things to rewrite. Full
-  data schema (Recipe/Ingredient field meanings, the rules the UI must respect around
+- **Python pipeline** (repo root): EPUB → structured recipe JSON. `extract.py`, `apply_metric.py`,
+  `build_density.py` and their output (`recipes_metric.json`, `density_table.json`,
+  `density_curated.json`) are mostly-settled inputs — prefer a separate pass over rewriting them,
+  but they are *not* off-limits: when the extractor is the actual bug, fix it there rather than
+  papering over it downstream (see "Ingredient sectioning" under Current state, where doing that
+  recovered 3,100 more section headers than a repair pass could). Changing `extract.py` means
+  re-extracting, which means checking recipe-id churn first — see the EPUB note below. Full data
+  schema (Recipe/Ingredient field meanings, the rules the UI must respect around
   `weighable`/`approx`/`ingredient_groups`) is documented in `CLAUDE_CODE_BRIEF.md` — read it
   before touching anything that consumes `recipes_metric.json` or `Recipe`/`Ingredient` types.
 - **`repair_sections.py`** (repo root): the one thing that *does* rewrite that output, into a
-  separate `recipes_repaired.json` — a repair pass for ingredient-sectioning damage `extract.py`
-  left behind and can't be re-run to fix (no EPUBs). It imports `extract`/`apply_metric` rather
-  than reimplementing them, so repaired ingredients carry real grams. `build-bundle.mjs` prefers
-  `recipes_repaired.json` when it exists. Read its docstring before touching anything about
-  `ingredient_groups`; see "Ingredient sectioning" under Current state.
+  separate `recipes_repaired.json` — a residual cleanup for ingredient-sectioning damage left over
+  after `extract.py`'s own fix (see "Ingredient sectioning" under Current state). It imports
+  `extract`/`apply_metric` rather than reimplementing them, so repaired ingredients carry real
+  grams. `build-bundle.mjs` prefers `recipes_repaired.json` when it exists. Read its docstring
+  before touching anything about `ingredient_groups`.
 - **Node data-prep** (`scripts/`): pulls hero photos out of source EPUBs, uploads them to
   Supabase Storage, tags recipes, builds the auto swipe decks, and merges everything into the
   bundle the app fetches at runtime. Only needs re-running after the Python pipeline processes
@@ -218,47 +222,59 @@ conservative (a misfiled produce item is a missed purchase), while `classifyAisl
 extractor leaving packaging and prep words in the item name — `can black beans` is a canned good,
 not dry beans.
 
-**Ingredient sectioning** is repaired by `repair_sections.py` (repo root) at pipeline time rather
-than load time, because unlike title repair it needs `extract.parse_ingredient` and
-`apply_metric.run` to give recovered ingredients real grams, and because fixing it upstream of the
-bundle means `tag-recipes.mjs` and `build-swipe-decks.mjs` — which read the bundle, not
-`recipes_metric.json` — pick the recovery up for free. Root cause: `extract.py` only accepts an
-ingredient line while the recipe has no steps yet (`looks_ing and not cur['steps']`), and several
-Page Street books put their extra ingredient sections in a sidebar that comes *after* the method in
-XHTML reading order. Those lines fell through to `notes`; `GROUP_HDR` has no such guard, so the
-section was still created, empty. 259 recipes showed an empty section card, and **1,032 real
-ingredient lines never reached the ingredient list, the shopping list or the tagger** — "My Famous
-Vegan Cinnamon Rolls" shipped with no cinnamon, sugar or frosting. The pass recovers those from
-`notes` (including headers `GROUP_HDR` never matched, like `VEGAN CREAM CHEESE FROSTING`), moves 15
-swallowed step sentences back into the method and 9 yield lines into `servings_text`, splits 48
-headers that landed as quantity-less ingredient *rows*, and drops whatever is still empty. Where
-ingredients were merged into one unnamed group so only the boundaries were lost (Coconut COOKIE
-BUTTER BARS: 13 ingredients, 3 orphaned layer names), boundaries are inferred from the method by DP
-over contiguous runs — but only 20 of 99 candidates pass the gate, deliberately, since a wrong
-grouping in a recipe you're cooking from is worse than a flat list. Three traps worth knowing if
-you touch the heuristics:
-- **Score density does not detect a bad split.** LOBSTER MUSHROOM Bisque's wrong 10/5 split scored
-  higher than most correct ones. What separates them is whether a section's step anchor was
-  *found* in the method or interpolated — hence the `anchor_found` gate.
-- **Header vocabulary has to be tiered.** A first pass treating any short Title-Case noun phrase
-  as a header made 3,576 false splits, turning every "Lime wedges" and "Sesame seeds" garnish row
-  into a section. STRONG nouns stand alone; SOFT ones ("cream", "sauce", "drizzle") need ALL CAPS
-  or a "for the" prefix, because they double as real ingredients.
-- **A component name is often a cross-reference, not a heading.** "Flaky Pie Crust" as an
-  ingredient row means "use the Flaky Pie Crust recipe". Two signals reject those: nothing follows
-  it in the group, or it matches another recipe's title in the same book (the same signal
-  `build-bundle.mjs` uses for `isComponent`).
-- **Ingredient-shaped is not the same as an ingredient.** Recovering any run of short, quantity-less
-  note lines pulled in a sidebar of *suggested* broth vegetables (32 unpriced nouns onto the
-  shopping list) and a list of method headings ("COCINANDO", "Assemble the Sandwich"). A run now has
-  to contain at least two lines carrying a real measurement before any of it is recovered.
+**Ingredient sectioning** is fixed in `extract.py` itself, with `repair_sections.py` as a residual
+cleanup pass afterwards. Both run before the bundle, so `tag-recipes.mjs` and
+`build-swipe-decks.mjs` — which read the bundle, not `recipes_metric.json` — pick the result up for
+free.
+
+Three separate bugs caused it, and the output alone was misleading about all three; the diagnosis
+only held up once the EPUB markup was read directly:
+1. `GROUP_HDR` only knew wordings like `for the …`/`topping`/`filling`, so a bare header
+   (`SUGAR COOKIE LAYER`) matched nothing and was silently dropped — collapsing every section into
+   one unnamed group.
+2. The *method* headings further down the same recipe (`FOR THE SUGAR COOKIE LAYER`) **did** match,
+   and `GROUP_HDR` had no guard against firing once steps had begun. Those were the empty section
+   cards.
+3. Where a book styles headers with the same class as its steps (Delicious AF Vegan's
+   `p.nonindent1`), the header was appended to `steps`, making `cur['steps']` non-empty so every
+   following ingredient failed the `looks_ing and not cur['steps']` guard and fell into `notes`.
+   That is how ~1,000 ingredient lines stopped reaching the ingredient list, the shopping list and
+   the tagger — "My Famous Vegan Cinnamon Rolls" shipped with no cinnamon, sugar or frosting.
+
+The fix identifies a header by **what follows it** — sitting directly above an ingredient line —
+because neither wording nor CSS class is reliable: The Ultimate Vegan Cookbook styles ingredient
+headers and method headings identically (`p.receipe`). Result across the corpus: named sections
+2,416 → 5,546, multi-section recipes 630 → 1,824, empty sections 515 → 0, ingredients +1,032,
+stranded `notes` lines 2,218 → ~1,065, **and zero recipe-id churn**, so nothing Supabase keys on was
+orphaned. Cost: 16 short label-shaped lines dropped corpus-wide (10 genuine headings, 6 numeral-less
+garnish items that had been misfiled as *steps* anyway); no real step and no ingredient was lost.
+
+Four traps, each from a false positive that actually happened — the first two are extractor-side and
+cost a wrong-data scare, the last two are repair-side:
+- **A yield line is not a header.** The metadata branch banks `SERVES 4` into `servings_text`
+  without consuming the line, so it falls through. Unguarded, that named 1,422 sections after the
+  serving count; `SERVES` also needs a digit right after the verb, so `MAKES ~ 1 LITER` and
+  `Makes one 8–9-inch tart` need the broader `YIELD_START`. Decorative rules (`______`) and
+  numeral-less ingredients (`Pinch of chili flakes`) need excluding for the same reason.
+- **Don't drop a short line without checking it's not prose.** `Lower the heat of the oven to 350°F
+  (177°C).` is a real 44-character step. Terminal punctuation plus a word cap is what separates it
+  from a label.
+- **Score density does not detect a bad inferred split.** LOBSTER MUSHROOM Bisque's wrong 10/5
+  scored higher than most correct ones. What separates them is whether a section's step anchor was
+  *found* in the method or interpolated — hence the `anchor_found` gate. The extractor later proved
+  the gate right: the book splits it 3/12, and Enchilada Roja 4/13 against inference's 15/2.
+- **Header vocabulary has to be tiered, and a component name is often a cross-reference.** Treating
+  any short Title-Case phrase as a header made 3,576 false splits, turning every "Lime wedges"
+  garnish row into a section; STRONG nouns stand alone, SOFT ones (`cream`, `sauce`, `drizzle`) need
+  ALL CAPS or a `for the` prefix. And "Flaky Pie Crust" as an ingredient row means *use that
+  recipe* — rejected when nothing follows it in the group, or when it matches another recipe's title
+  in the same book (the signal `build-bundle.mjs` uses for `isComponent`).
 
 Ties break toward keeping an ingredient throughout — a garnish misfiled into the ingredient list is
 correct, a garnish mistaken for a header is an ingredient lost twice. `section-repair-report.txt`
 (gitignored, like `tag-report.txt`) logs every change per recipe; read it before trusting a
-heuristic change. Re-running the pass changes tagging inputs: `tag-recipes.mjs --dry-run` currently
-reports +122/−41 tags against the live table, so **tagging and deck-building should be re-run**
-(by hand, per the delete-then-insert warning above).
+heuristic change. After any re-extract, re-run `repair_sections.py`, `build-bundle.mjs`, then
+tagging and deck-building by hand (per the delete-then-insert warning above).
 
 **Recipe titles** are repaired at load time in `app/src/lib/recipeTitle.ts`, called once from
 `loadStaticRecipes()` in `lib/data.ts` so search, sorting and deck building all see the cleaned
@@ -269,12 +285,23 @@ drop-cap splits rejoined (`V ANILLA Y OGURT`, an EPUB decorative first letter in
 and 59 La Vida Verde titles unwrapped from parentheses (the extractor kept only the English
 translation and dropped the Spanish name).
 
-**Known-unfixable title damage**, recorded in `NewIdeas.txt`: 68 recipes whose title is a yield
+**Title damage still outstanding**, recorded in `NewIdeas.txt`: 56 recipes whose title is a yield
 line (`SERVES 2`, mostly Effortless Vegan) — the real name was never extracted, and each sits
 alone in its own source file, so it can't be recovered from the bundle; and 767 partially-capsed
 titles where the book capitalises the hero ingredient on purpose (`Easy Red Lentil DAL`), left
-alone since flattening them would wreck real acronyms. **The source EPUBs are no longer in the
-repo**, so nothing can be re-extracted until they're located.
+alone since flattening them would wreck real acronyms.
+
+**The source EPUBs are available** — 61 files, 11GB, at `C:\Users\Cameron\Documents\Vegan
+Cookbooks\`, matching the 61 distinct `source_book` values exactly. They are *not* in the repo and
+must stay out of it (copyrighted), which is what an earlier note in this file meant by "no longer
+in the repo" — that phrasing was read as "lost", and it cost a round of building repair passes for
+damage the extractor could simply be fixed to avoid. So a re-extract **is** available:
+`python extract.py "/c/Users/Cameron/Documents/Vegan Cookbooks/"*.epub && python apply_metric.py`
+(~6 min; needs `pip install -r requirements.txt` for bs4/lxml). Two things to know before doing it:
+recipe ids are `sha1(book|source_file|title)[:12]`, so any title or recipe-boundary change reissues
+ids and orphans every `recipe_id`-keyed row in Supabase — verify id churn is 0 before shipping one
+(the section fix below achieved that); and the yield-line titles above are the known lever that
+*would* churn them.
 
 **Tagging** (`scripts/tag-recipes.mjs`) was reworked from boolean any-keyword-matching to
 evidence-weighted matching: ingredients match the parsed ingredient list with real plural forms

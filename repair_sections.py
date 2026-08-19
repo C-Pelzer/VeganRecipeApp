@@ -2,24 +2,33 @@
 
 WHY THIS EXISTS
 ---------------
-extract.py only accepts an ingredient line while the recipe has no steps yet
-(`if looks_ing and not cur['steps']`). Several Page Street books lay a recipe
-out in columns, and their extra ingredient sections ("FILLING", "TOPPING", "FOR
-THE CHOCOLATE LAYER") live in a sidebar that comes *after* the method in XHTML
-reading order. Those lines therefore fail the guard and fall through to
-`cur['notes']`, while GROUP_HDR -- which has no such guard -- still creates the
-section. The result is an empty section on screen and, much worse, ~930 real
-ingredient lines that no longer reach the ingredient list, the shopping list or
-the tagger. "My Famous Vegan Cinnamon Rolls" ships with no cinnamon, no sugar
-and no frosting.
+extract.py mis-read the ingredient sections in several Page Street books, three
+ways at once. Reading the actual EPUB markup (which is available -- see CLAUDE.md)
+showed what the output alone could not:
 
-Fixing extract.py is the right repair and is not available: the source EPUBs are
-no longer in the repo, so nothing can be re-extracted (same constraint that put
-title repair in app/src/lib/recipeTitle.ts). extract.py and apply_metric.py are
-treated as stable inputs per CLAUDE.md; this is a separate pass over their
-output that reuses their parsers rather than reimplementing them, so a recovered
-ingredient gets exactly the fields -- grams included -- it would have had if the
-extractor had seen it in the right place.
+  - Its GROUP_HDR pattern only knew wordings like "for the ...", "topping" and
+    "filling", so a bare header ("SUGAR COOKIE LAYER") matched nothing and was
+    discarded -- collapsing every section into one unnamed group.
+  - The *method* headings further down the same recipe ("FOR THE SUGAR COOKIE
+    LAYER") did match, and GROUP_HDR had no guard against firing once steps had
+    begun. Those were the empty sections that rendered as blank cards.
+  - Where a book styles its headers with the same class as its steps (Delicious
+    AF Vegan's p.nonindent1), the header was appended to `steps`. That made
+    cur['steps'] non-empty, so every ingredient after it failed the
+    `looks_ing and not cur['steps']` guard and fell into `notes` -- which is how
+    ~1,000 real ingredient lines stopped reaching the ingredient list, the
+    shopping list and the tagger. "My Famous Vegan Cinnamon Rolls" shipped with
+    no cinnamon, no sugar and no frosting.
+
+extract.py now fixes all three at the source by identifying a header from what
+*follows* it rather than from its wording or class. This pass is what remains
+afterwards: a residual cleanup for recipes the extractor still can't segment,
+mostly ones packing two variants into a single document ("...-2 Ways", where the
+shared filling and frosting attach to whichever variant the splitter ended on).
+
+It reuses extract.parse_ingredient and apply_metric.run rather than
+reimplementing them, so a recovered ingredient gets exactly the fields -- grams
+included -- it would have had if the extractor had seen it in the right place.
 
     recipes_metric.json  ->  repair_sections.py  ->  recipes_repaired.json
                                                      section-repair-report.txt
@@ -30,24 +39,24 @@ is never written to.
     python repair_sections.py --dry-run     # report only, writes no JSON
     python repair_sections.py
 
-THE FOUR DEFECTS
-----------------
-1. Ingredient lines (and the section headers between them) stranded in `notes`.
-   Recoverable exactly: parse them back and attach them to the sections that
-   were left empty. 124 recipes.
-2. Empty sections whose "name" was never a header at all -- 18 swallowed step
-   sentences ("To serve, scatter the berries over the top of the cheesecake."),
-   10 yield lines ("YIELDS ABOUT 1 PINT"), 2 comma-list garnish lines. Each goes
-   back where it belongs.
-3. Section headers that landed as ingredient *rows* ("Chocolate Layer" with no
-   quantity). The boundary is known exactly -- split the group there. 16 rows.
-4. Empty sections where the ingredients were merged into one unnamed group
-   instead of being dropped, so only the boundaries are lost (e.g. Coconut
-   COOKIE BUTTER BARS: 13 ingredients, 3 orphaned layer names, empty `notes`).
-   Boundaries are inferred from the method -- see infer_boundaries().
+WHAT IT STILL FIXES (counts as of the 2026-08-19 extractor fix; 130 recipes)
+---------------------------------------------------------------------------
+1. Ingredient lines, and the section headers between them, stranded in `notes`:
+   54 sections' worth. Parsed back and attached to the section they belong to.
+2. Section headers that landed as ingredient *rows* ("Chocolate Layer", with no
+   quantity) -- 48 of them. The boundary is exact, so the group splits there.
+3. Empty sections whose "name" was never a header: 9 yield lines ("YIELDS ABOUT
+   1 PINT"), which the extractor's mid-recipe heading branch still creates
+   because its SERVES check wants a digit right after the verb.
+4. Whatever is left with no ingredients gets dropped, named or not -- 37 groups.
+   A flat list is honest; a blank card is not.
 
-Sections that survive all of that with no ingredients are dropped: a flat list
-is honest, an empty card is not.
+infer_boundaries() also survives, for recipes where the ingredients merged into
+one unnamed group so only the boundaries were lost. It now fires on almost
+nothing, because the extractor recovers the real headers instead of guessing --
+and where the two disagreed, the book proved the extractor right (it splits
+ENCHILADA Roja 4/13 and LOBSTER MUSHROOM Bisque 3/12; inference wanted 15/2 and
+10/5, and its confidence gate rejected both). Kept for the residue, not relied on.
 """
 
 import json
@@ -602,12 +611,18 @@ def repair(recipes, density):
         split_header_rows(r, log, titles_by_book[r['source_book']])
         infer_boundaries(r, log)
 
-        dropped = [g['name'] for g in r['ingredient_groups']
-                   if not g['ingredients'] and g['name']]
+        # Unnamed empties count too. extract.py's rescue_yield() pulls a yield
+        # line back out of the first group, which empties it outright when that
+        # was its only row -- 18 recipes in Great Vegan Meals for the Carnivorous
+        # Family arrive that way. An unnamed empty group renders the same blank
+        # card a named one does, so the guarantee here is "no empty sections",
+        # not "no empty *named* sections".
+        dropped = [g['name'] for g in r['ingredient_groups'] if not g['ingredients']]
         if dropped:
             r['ingredient_groups'] = [g for g in r['ingredient_groups'] if g['ingredients']]
             for name in dropped:
-                log('empty section dropped (no ingredients to recover)', name)
+                log('empty section dropped (no ingredients to recover)',
+                    name or '(unnamed)')
         # A lone unnamed group is the flat list the UI already renders headerless.
         if len(r['ingredient_groups']) == 1 and r['ingredient_groups'][0]['name'] \
                 and before != sum(len(g['ingredients']) for g in r['ingredient_groups']):
